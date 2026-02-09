@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<style>
+body {
+  font-family: Inter, sans-serif;
+  padding: 12px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f4f4f4;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.group:hover { background: #eaeaea; }
+
+.group-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.group-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.type-label {
+  font-size: 9px;
+  color: #555;
+  line-height: 1;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.detail-swatch {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+}
+
+#hex-code {
+  font-size: 12px;
+  color: #333;
+}
+
+.nav {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.back {
+  margin-top: 20px;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.select-all {
+  margin-top: 10px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  text-align: center;
+  color: #777;
+}
+</style>
+</head>
+
+<body>
+<div id="top-bar-container"></div>
+<div id="app"></div>
+
+<script>
+const app = document.getElementById("app");
+const topBarContainer = document.getElementById("top-bar-container");
+
+let viewMode = "list";
+let currentGroup = null;
+let currentIndex = 0;
+let showHidden = false;
+let lastGroups = [];
+
+function renderTopBar(show) {
+  topBarContainer.innerHTML = "";
+  if (!show || viewMode !== "list") return;
+
+  const div = document.createElement("div");
+  div.className = "top-bar";
+  div.innerHTML = `
+    <label>
+      <input type="checkbox" ${showHidden ? "checked" : ""}/> Exibir elementos ocultos
+    </label>
+  `;
+
+  div.querySelector("input").addEventListener("change", e => {
+    showHidden = e.target.checked;
+    parent.postMessage({ pluginMessage: { type: "toggle-hidden", value: showHidden } }, "*");
+  });
+
+  topBarContainer.appendChild(div);
+}
+
+function paintToCss(paint, node) {
+  if (!paint) return "#000";
+
+  if (paint.type === "SOLID") {
+    const r = Math.round(paint.color.r * 255);
+    const g = Math.round(paint.color.g * 255);
+    const b = Math.round(paint.color.b * 255);
+    let a = paint.opacity ?? 1;
+    if (node?.opacity) a *= node.opacity;
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  if (paint.type.startsWith("GRADIENT")) {
+    const stops = paint.gradientStops.map(s => {
+      const r = Math.round(s.color.r * 255);
+      const g = Math.round(s.color.g * 255);
+      const b = Math.round(s.color.b * 255);
+      return `rgba(${r},${g},${b},${s.color.a}) ${s.position * 100}%`;
+    }).join(", ");
+    return `linear-gradient(90deg, ${stops})`;
+  }
+
+  return "#000";
+}
+
+function selectCurrentNode() {
+  if (!currentGroup) return;
+  const entry = currentGroup.nodePaints[currentIndex];
+  parent.postMessage({
+    pluginMessage: { type: "select-node", nodeId: entry.nodeId }
+  }, "*");
+}
+
+onmessage = e => {
+  const msg = e.data.pluginMessage;
+  if (msg.type === "empty") renderEmpty();
+  if (msg.type === "result") renderList(msg.groups);
+};
+
+function renderEmpty() {
+  viewMode = "list";
+  renderTopBar(false);
+  app.innerHTML = `<div class="empty"><strong>Selecione um ou mais frames</strong></div>`;
+}
+
+function renderList(groups) {
+  viewMode = "list";
+  renderTopBar(true);
+  lastGroups = groups;
+
+  if (!groups.length) {
+    app.innerHTML = `
+      <div class="empty">
+        Todos os elementos do frame<br>
+        <span style="color:#2ECC71">utilizam tokens de cor</span>
+      </div>
+    `;
+    return;
+  }
+
+  app.innerHTML = `
+    <h3>Elementos sem token aplicado</h3>
+    ${groups.map(g => {
+      const np = g.nodePaints[0];
+      const swatch = paintToCss(np.paint, np.node);
+
+      const typeLabel =
+        g.nodePaints.every(n => n.isStroke) ? "Stroke" :
+        g.nodePaints.every(n => !n.isStroke) ? "Fill" : "Mix";
+
+      return `
+        <div class="group" onclick='openDetail(${JSON.stringify(g)})'>
+          <div class="group-left">
+            <strong>${g.hex}</strong>
+            ${g.nodePaints.length} elementos
+          </div>
+          <div class="group-right">
+            <div class="swatch" style="background:${swatch}"></div>
+            <div class="type-label">${typeLabel}</div>
+          </div>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
+function openDetail(group) {
+  currentGroup = group;
+  currentIndex = 0;
+  viewMode = "detail";
+  topBarContainer.innerHTML = "";
+  renderDetail();
+  selectCurrentNode();
+}
+
+function renderDetail() {
+  const entry = currentGroup.nodePaints[currentIndex];
+  const bg = paintToCss(entry.paint, entry.node);
+
+  app.innerHTML = `
+    <div class="detail">
+      <div class="detail-swatch" style="background:${bg}"></div>
+      <div id="hex-code">${currentGroup.hex}</div>
+      <div class="type-label">${entry.isStroke ? "Stroke" : "Fill"}</div>
+
+      <div>${currentIndex + 1} de ${currentGroup.nodePaints.length}</div>
+
+      <div class="nav">
+        <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>◀</button>
+        <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>▶</button>
+      </div>
+
+      ${currentGroup.nodePaints.length > 1
+        ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
+        : ""}
+
+      <div class="back" onclick="back()">Voltar para lista</div>
+    </div>
+  `;
+}
+
+function next() {
+  currentIndex = (currentIndex + 1) % currentGroup.nodePaints.length;
+  renderDetail();
+  selectCurrentNode();
+}
+
+function prev() {
+  currentIndex = (currentIndex - 1 + currentGroup.nodePaints.length) % currentGroup.nodePaints.length;
+  renderDetail();
+  selectCurrentNode();
+}
+
+function selectAll() {
+  parent.postMessage({
+    pluginMessage: {
+      type: "select-multiple-nodes",
+      nodeIds: currentGroup.nodePaints.map(n => n.nodeId)
+    }
+  }, "*");
+}
+
+function back() {
+  viewMode = "list";
+  renderTopBar(true);
+  renderList(lastGroups);
+}
+</script>
+</body>
+</html>
