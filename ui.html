@@ -2,32 +2,75 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+
 <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+& h4 {
+    font-weight: 600;
+    font-size: 14px;
+    margin: 0;
+    display: inline-block;
+    line-height: 14px;
+  }
+
+
+
+html, body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 body {
-  font-family: Inter, sans-serif;
+  font-family: "Inter";
   padding: 12px;
   margin: 0;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.h3 {
+  font-weight: normal;
+  font-size: 14px;
+  margin: 0;
+  display: inline-block;
+  line-height: 14px;
 }
 
 .tabs {
   display: flex;
   gap: 4px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid #E4E4E7;
+  width: 185px;
 }
 
 .tab {
+  font-size: 14px;
+  color: #18181B;
+  font-weight: 500;
   padding: 8px 16px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  color: #777;
   font-weight: 500;
 }
 
 .tab.active {
-  color: #333;
-  border-bottom-color: #0066FF;
+  color: #4361EE;
+  border-bottom-color: #4361EE;
 }
 
 .top-bar {
@@ -39,15 +82,12 @@ body {
 
 .group {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 8px;
   border-radius: 8px;
-  background: #f4f4f4;
   margin-bottom: 6px;
   cursor: pointer;
 }
-.group:hover { background: #eaeaea; }
 
 .group-left {
   display: flex;
@@ -142,21 +182,168 @@ button {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  height: 100%;
+  height: 346px;
   text-align: center;
   color: #777;
 }
+
+.empty-2 {
+  border: 2px solid #E4E4E7;
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 287px;
+  text-align: center;
+  color: #777;
+}
+
+.switch-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: sans-serif;
+  font-size: 14px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 16px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(38, 39, 43, 0.08);
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2.2px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #4361EE; /* cor do switch ligado */
+}
+
+input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.app-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  & img {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px; /* padding em volta de tudo */
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.group:hover {
+  background: rgba(112, 112, 123, 0.16);
+}
+
+.swatch-large {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.group-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.group-info-top {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* espaço entre HEX e tipo */
+}
+
+.group-info-bottom {
+  font-size: 12px;
+  color: rgba(24, 24, 27, 0.72);
+}
+
+.app-wrapper-2 {
+  border: 2px solid #E4E4E7; /* borda ao redor da caixa */
+  border-radius: 8px;
+  height: 287px;             /* altura fixa */
+  overflow-y: auto;          /* scroll vertical quando passar do tamanho */
+  padding: 12px;             /* padding interno da caixa */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;                  /* espaço entre os itens */
+
+}
+
+h4 + .app-wrapper-2 {
+  margin-top: 8px;
+}
+
+
+.group-info-top .hex {
+  font-size: 12px;
+  color: #18181B;
+}
+
+.group-info-top .type-label {
+  font-size: 12px;
+  color: rgba(24, 24, 27, 0.72);
+}
+
+
+
+
 </style>
 </head>
 
 <body>
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('colors')">Cores</div>
-  <div class="tab" onclick="switchTab('typography')">Tipografia</div>
+  <div class="tab active" onclick="switchTab('colors')">Colors</div>
+  <div class="tab" onclick="switchTab('typography')">Font styles</div>
 </div>
 
-<div id="top-bar-container"></div>
 <div id="app"></div>
+<div id="top-bar-container"></div>
 
 <script>
 const app = document.getElementById("app");
@@ -197,9 +384,13 @@ function renderTopBar(show) {
   const div = document.createElement("div");
   div.className = "top-bar";
   div.innerHTML = `
-    <label>
-      <input type="checkbox" ${showHidden ? "checked" : ""}/> Exibir elementos ocultos
-    </label>
+    <div class="switch-container">
+      <label class="switch">
+        <input type="checkbox" ${showHidden ? "checked" : ""}/>
+        <span class="slider"></span>
+      </label>
+      <span class="switch-label">Exibir elementos ocultos</span>
+    </div>
   `;
 
   div.querySelector("input").addEventListener("change", e => {
@@ -284,7 +475,7 @@ onmessage = e => {
 function renderEmpty() {
   viewMode = "list";
   renderTopBar(false);
-  app.innerHTML = `<div class="empty"><strong>Selecione um ou mais frames</strong></div>`;
+  app.innerHTML = `<div class="empty">Selecione um ou mais frames</div>`;
 }
 
 function renderColorList(groups) {
@@ -294,38 +485,50 @@ function renderColorList(groups) {
 
   if (!groups.length) {
     app.innerHTML = `
-      <div class="empty">
-        Todos os elementos do frame<br>
-        <span style="color:#2ECC71">utilizam tokens de cor</span>
+    <div class="app-wrapper">
+      <h4>Elementos sem token aplicado:</h4>
+      <div class="empty-2">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAARtSURBVHgBzVlNbBtFFP5mvIbiKMHQH3GoXa9aIyKQ6oIEF1BdDnDpJVyoxIUiIU4QlxM5VElUCTiBI04IIcIBiV7IIb20l7iCS5FARoqUSiSyGyMh2kBNGrutvbvT98ZZN3Fde9Z1fj7J2p+Z2fnyvTfvzbwI9Ig/S/W0BXnUhUhDICWUiiogym0CKHsQRbrST+U9eJeTsXAOPUAE6VwoqKhjeRkJjPpkjCdSKNIlJ93apG0/UTQeZ9KJibmWN0G3o+gDiOy0KdGuBJf+cjNQGA+qWNeJSVEp1YR90Pq+Y79OjYslN4s+qfZQAgrZw/HQmYe2t3vZMKmaAVQa2wAFkV9zxIljtii3tsl2A4jc3HaRY9BKTw1qQR7EAwQbZlUpbDtUemnZ/bL17SYTLy4770KI77CDUB7OJA+Fsv5zk2Dhb5XwXDWnlEpgZ1G+5Ujb98emiT3XG98F5BjRoZA37j9oBVk91/EK6AOu33Bw9rN/9f177zyJV17ag15AKj7FKmoFWT30CfNXa6hUFU68GsHnU//p+14wZHk6/q6bmBJ+n1CpejiwL4RTbw3q65XfbqMX0J+V4avkXUm/fI/Ne+FiBS8MP94kOxCR6BFRvWOSkMd7M8JmzF5cw/mZW6SahbdHBjG/cFeb1z4URq8gbkctMm9KC/oI+PGnVVy4VMGpkSGcfHMAhWs1TZhNzEQZrKQdt3Bgv2X8XUqBaYuoJRAAbMZZIlNcriMRC+vPzP1yG+fG9jXVmr1UpXYXHCTOz6zpd5Vq4/nc2F5zVZVKiaWSezPIVuqDj//RKuzfKzWxgYjAJ6NPN/2uE3hVR0jJj943nq4sg5Bjc11fcfHh+gRM6usvnjEix0jEw7ix4iIAooGW2JXf72gy7Fu/0v3JNwa0glsJyQcc087sfzapwIuAV6ipcj54HI8PADKxEMYEmVSEFPOzQ1D1issOmTnIKqZjAW2586YDmFCVyPnEgqQx33+DqC7o6ColVM50AK9ensSPZZzG5q/e1RmjG7794X+8/lpE+685QZW3HHh/CJitFfafuZ9XUal4eP65x/DVN/e94+UX9+idC/9a0xsHcl69Y5lBBAFlkpy2lWksZKXOfrqCAvkSg83FMbBwrU4xsdo0YztwaGIFjUHH0iPxkO0T5HPvhOnY+YWavnJGaF0ofttGtOtnQHCaCJ5ubFgblYOb2EWoOzV7mCoP2lls2rnyARq7BaTe8HpZpOnN0pWTQYL2loF8r051G/+xSZBV9AQmsdOges3whqLSpniQPBjK7qSpFc19pKWY1HZpLZa8bS19MLg+k4zJY63v20bokCNGiLtxCnx0qBwXj9q1dAxOXCtRonG62iqwWZMdym8dcxzX7TylTlO9poj+o0zqZDqRY3RNws/Grel6iOQXmEafwKpx/eVwLDTVrW+g/LNAJZKwrkLQQT/4WZoVy646cqpdoRL9ILgRhZI6Tv9eSPOxVUGT5Z+/4SjTlyk78UJTOdqV5O2YuIwecA/A0uHIhF2qXAAAAABJRU5ErkJggg==" alt="Ilustração"/>
+
+
+        Tudo certo por aqui!
       </div>
+    </div>
     `;
     return;
   }
 
   app.innerHTML = `
-    <h3>Elementos sem token aplicado</h3>
-    ${groups.map(g => {
-      const np = g.nodePaints[0];
-      const swatch = paintToCss(np.paint, np.node);
+    <h4>Elementos sem token aplicado:</h4>
+    <div class="app-wrapper-2">
+      ${groups.map(g => {
+        const np = g.nodePaints[0];
+        const swatch = paintToCss(np.paint, np.node);
 
-      const typeLabel =
-        g.nodePaints.every(n => n.isStroke) ? "Stroke" :
-        g.nodePaints.every(n => !n.isStroke) ? "Fill" : "Mix";
+        const typeLabel =
+          g.nodePaints.every(n => n.isStroke) ? "Stroke" :
+          g.nodePaints.every(n => !n.isStroke) ? "Fill" : "Mix";
 
-      return `
-        <div class="group" onclick='openDetail(${JSON.stringify(g)})'>
-          <div class="group-left">
-            <strong>${g.hex}</strong>
-            ${g.nodePaints.length} elementos
+        return `
+          <div class="group" onclick='openDetail(${JSON.stringify(g)})'>
+            <div class="swatch-large" style="background:${swatch}"></div>
+
+            <div class="group-info">
+              <div class="group-info-top">
+                <strong class="hex">${g.hex}</strong>
+                <span class="type-label">(${typeLabel.toLowerCase()})</span>
+              </div>
+
+              <div class="group-info-bottom">
+                ${g.nodePaints.length} elementos
+              </div>
+            </div>
           </div>
-          <div class="group-right">
-            <div class="swatch" style="background:${swatch}"></div>
-            <div class="type-label">${typeLabel}</div>
-          </div>
-        </div>
-      `;
-    }).join("")}
+        `;
+      }).join("")}
+    </div>
   `;
+
 }
 
 function renderTypographyList(groups) {
@@ -335,16 +538,22 @@ function renderTypographyList(groups) {
 
   if (!groups.length) {
     app.innerHTML = `
-      <div class="empty">
-        Todos os textos do frame<br>
-        <span style="color:#2ECC71">utilizam tokens de tipografia</span>
+    <div class="app-wrapper">
+      <h4>Elementos sem token aplicado:</h4>
+      <div class="empty-2">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAARtSURBVHgBzVlNbBtFFP5mvIbiKMHQH3GoXa9aIyKQ6oIEF1BdDnDpJVyoxIUiIU4QlxM5VElUCTiBI04IIcIBiV7IIb20l7iCS5FARoqUSiSyGyMh2kBNGrutvbvT98ZZN3Fde9Z1fj7J2p+Z2fnyvTfvzbwI9Ig/S/W0BXnUhUhDICWUiiogym0CKHsQRbrST+U9eJeTsXAOPUAE6VwoqKhjeRkJjPpkjCdSKNIlJ93apG0/UTQeZ9KJibmWN0G3o+gDiOy0KdGuBJf+cjNQGA+qWNeJSVEp1YR90Pq+Y79OjYslN4s+qfZQAgrZw/HQmYe2t3vZMKmaAVQa2wAFkV9zxIljtii3tsl2A4jc3HaRY9BKTw1qQR7EAwQbZlUpbDtUemnZ/bL17SYTLy4770KI77CDUB7OJA+Fsv5zk2Dhb5XwXDWnlEpgZ1G+5Ujb98emiT3XG98F5BjRoZA37j9oBVk91/EK6AOu33Bw9rN/9f177zyJV17ag15AKj7FKmoFWT30CfNXa6hUFU68GsHnU//p+14wZHk6/q6bmBJ+n1CpejiwL4RTbw3q65XfbqMX0J+V4avkXUm/fI/Ne+FiBS8MP94kOxCR6BFRvWOSkMd7M8JmzF5cw/mZW6SahbdHBjG/cFeb1z4URq8gbkctMm9KC/oI+PGnVVy4VMGpkSGcfHMAhWs1TZhNzEQZrKQdt3Bgv2X8XUqBaYuoJRAAbMZZIlNcriMRC+vPzP1yG+fG9jXVmr1UpXYXHCTOz6zpd5Vq4/nc2F5zVZVKiaWSezPIVuqDj//RKuzfKzWxgYjAJ6NPN/2uE3hVR0jJj943nq4sg5Bjc11fcfHh+gRM6usvnjEix0jEw7ix4iIAooGW2JXf72gy7Fu/0v3JNwa0glsJyQcc087sfzapwIuAV6ipcj54HI8PADKxEMYEmVSEFPOzQ1D1issOmTnIKqZjAW2586YDmFCVyPnEgqQx33+DqC7o6ColVM50AK9ensSPZZzG5q/e1RmjG7794X+8/lpE+685QZW3HHh/CJitFfafuZ9XUal4eP65x/DVN/e94+UX9+idC/9a0xsHcl69Y5lBBAFlkpy2lWksZKXOfrqCAvkSg83FMbBwrU4xsdo0YztwaGIFjUHH0iPxkO0T5HPvhOnY+YWavnJGaF0ofttGtOtnQHCaCJ5ubFgblYOb2EWoOzV7mCoP2lls2rnyARq7BaTe8HpZpOnN0pWTQYL2loF8r051G/+xSZBV9AQmsdOges3whqLSpniQPBjK7qSpFc19pKWY1HZpLZa8bS19MLg+k4zJY63v20bokCNGiLtxCnx0qBwXj9q1dAxOXCtRonG62iqwWZMdym8dcxzX7TylTlO9poj+o0zqZDqRY3RNws/Grel6iOQXmEafwKpx/eVwLDTVrW+g/LNAJZKwrkLQQT/4WZoVy646cqpdoRL9ILgRhZI6Tv9eSPOxVUGT5Z+/4SjTlyk78UJTOdqV5O2YuIwecA/A0uHIhF2qXAAAAABJRU5ErkJggg==" alt="Ilustração"/>
+
+
+        Tudo certo por aqui!
       </div>
+    </div>
     `;
     return;
   }
 
   app.innerHTML = `
-    <h3>Textos sem token aplicado</h3>
+  <h4>Textos sem token aplicado</h4>
+  <div class="app-wrapper-2">
     ${groups.map(g => {
       const style = g.style;
       const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
@@ -352,17 +561,35 @@ function renderTypographyList(groups) {
 
       return `
         <div class="group" onclick='openTypographyDetail(${JSON.stringify(g)})'>
-          <div class="group-left">
-            <strong>${style.fontFamily} ${style.fontStyle}</strong>
-            ${g.nodeStyles.length} elementos
+          <!-- Quadrado de preview da fonte -->
+          <div class="swatch-large" style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: '${style.fontFamily}', sans-serif;
+            font-weight: ${cssFont.weight};
+            font-style: ${cssFont.style};
+            font-size: 20px;
+            color: #18181B;
+          ">
+            Aa
           </div>
-          <div class="group-right">
-            <div style="font-family: '${style.fontFamily}', sans-serif; font-weight: ${cssFont.weight}; font-style: ${cssFont.style}; font-size: 20px; line-height: 1;">Aa</div>
+
+          <!-- Informações da fonte -->
+          <div class="group-info">
+            <div class="group-info-top">
+              <strong class="hex">${style.fontFamily} ${style.fontStyle}</strong>
+            </div>
+            <div class="group-info-bottom">
+              ${g.nodeStyles.length} elementos
+            </div>
           </div>
         </div>
       `;
     }).join("")}
-  `;
+  </div>
+`;
+
 }
 
 function openDetail(group) {

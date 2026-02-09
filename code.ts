@@ -1,7 +1,7 @@
 "use strict";
 
 // Exibe a UI do plugin
-figma.showUI(__html__, { width: 360, height: 460 });
+figma.showUI(__html__, { width: 360, height: 422 });
 
 // Variáveis de estado
 let analyzedFrames: (FrameNode | ComponentNode | InstanceNode)[] = [];
