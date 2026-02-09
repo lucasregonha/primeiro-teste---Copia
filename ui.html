@@ -10,6 +10,26 @@ body {
   font-size: 12px;
 }
 
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tab {
+  padding: 8px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  color: #777;
+  font-weight: 500;
+}
+
+.tab.active {
+  color: #333;
+  border-bottom-color: #0066FF;
+}
+
 .top-bar {
   display: flex;
   justify-content: space-between;
@@ -70,6 +90,25 @@ body {
   border: 1px solid #ddd;
 }
 
+.text-preview {
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.text-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+}
+
 #hex-code {
   font-size: 12px;
   color: #333;
@@ -111,6 +150,11 @@ button {
 </head>
 
 <body>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('colors')">Cores</div>
+  <div class="tab" onclick="switchTab('typography')">Tipografia</div>
+</div>
+
 <div id="top-bar-container"></div>
 <div id="app"></div>
 
@@ -123,6 +167,28 @@ let currentGroup = null;
 let currentIndex = 0;
 let showHidden = false;
 let lastGroups = [];
+let currentTab = "colors";
+
+function switchTab(tab) {
+  currentTab = tab;
+  
+  // Atualiza visual das tabs
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  const tabs = document.querySelectorAll(".tab");
+  if (tab === "colors") {
+    tabs[0].classList.add("active");
+  } else {
+    tabs[1].classList.add("active");
+  }
+  
+  // Notifica o plugin
+  parent.postMessage({ pluginMessage: { type: "switch-tab", tab } }, "*");
+  
+  // Reseta view
+  viewMode = "list";
+  currentGroup = null;
+  lastGroups = [];
+}
 
 function renderTopBar(show) {
   topBarContainer.innerHTML = "";
@@ -169,9 +235,37 @@ function paintToCss(paint, node) {
   return "#000";
 }
 
+// Converte o estilo do Figma (ex: "Bold Italic") para propriedades CSS
+function parseFigmaFontStyle(fontStyle, fontWeight) {
+  let cssWeight = typeof fontWeight === "number" ? fontWeight : 400;
+  let cssStyle = "normal";
+  
+  const styleLower = fontStyle.toLowerCase();
+  
+  // Detecta italic/oblique
+  if (styleLower.includes("italic") || styleLower.includes("oblique")) {
+    cssStyle = "italic";
+  }
+  
+  // Mapeia estilos comuns para pesos
+  if (styleLower.includes("thin")) cssWeight = 100;
+  else if (styleLower.includes("extralight") || styleLower.includes("extra light")) cssWeight = 200;
+  else if (styleLower.includes("light")) cssWeight = 300;
+  else if (styleLower.includes("regular") || styleLower.includes("normal")) cssWeight = 400;
+  else if (styleLower.includes("medium")) cssWeight = 500;
+  else if (styleLower.includes("semibold") || styleLower.includes("semi bold")) cssWeight = 600;
+  else if (styleLower.includes("bold")) cssWeight = 700;
+  else if (styleLower.includes("extrabold") || styleLower.includes("extra bold")) cssWeight = 800;
+  else if (styleLower.includes("black") || styleLower.includes("heavy")) cssWeight = 900;
+  
+  return { weight: cssWeight, style: cssStyle };
+}
+
 function selectCurrentNode() {
   if (!currentGroup) return;
-  const entry = currentGroup.nodePaints[currentIndex];
+  const entry = currentTab === "colors" 
+    ? currentGroup.nodePaints[currentIndex]
+    : currentGroup.nodeStyles[currentIndex];
   parent.postMessage({
     pluginMessage: { type: "select-node", nodeId: entry.nodeId }
   }, "*");
@@ -180,7 +274,11 @@ function selectCurrentNode() {
 onmessage = e => {
   const msg = e.data.pluginMessage;
   if (msg.type === "empty") renderEmpty();
-  if (msg.type === "result") renderList(msg.groups);
+  if (msg.type === "result-colors" && currentTab === "colors") renderColorList(msg.groups);
+  if (msg.type === "result-typography" && currentTab === "typography") renderTypographyList(msg.groups);
+  if (msg.type === "init-tab") {
+    currentTab = msg.tab;
+  }
 };
 
 function renderEmpty() {
@@ -189,7 +287,7 @@ function renderEmpty() {
   app.innerHTML = `<div class="empty"><strong>Selecione um ou mais frames</strong></div>`;
 }
 
-function renderList(groups) {
+function renderColorList(groups) {
   viewMode = "list";
   renderTopBar(true);
   lastGroups = groups;
@@ -230,16 +328,62 @@ function renderList(groups) {
   `;
 }
 
+function renderTypographyList(groups) {
+  viewMode = "list";
+  renderTopBar(true);
+  lastGroups = groups;
+
+  if (!groups.length) {
+    app.innerHTML = `
+      <div class="empty">
+        Todos os textos do frame<br>
+        <span style="color:#2ECC71">utilizam tokens de tipografia</span>
+      </div>
+    `;
+    return;
+  }
+
+  app.innerHTML = `
+    <h3>Textos sem token aplicado</h3>
+    ${groups.map(g => {
+      const style = g.style;
+      const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
+      const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
+
+      return `
+        <div class="group" onclick='openTypographyDetail(${JSON.stringify(g)})'>
+          <div class="group-left">
+            <strong>${style.fontFamily} ${style.fontStyle}</strong>
+            ${g.nodeStyles.length} elementos
+          </div>
+          <div class="group-right">
+            <div style="font-family: '${style.fontFamily}', sans-serif; font-weight: ${cssFont.weight}; font-style: ${cssFont.style}; font-size: 20px; line-height: 1;">Aa</div>
+          </div>
+        </div>
+      `;
+    }).join("")}
+  `;
+}
+
 function openDetail(group) {
   currentGroup = group;
   currentIndex = 0;
   viewMode = "detail";
   topBarContainer.innerHTML = "";
-  renderDetail();
+  renderColorDetail();
   selectCurrentNode();
 }
 
-function renderDetail() {
+function openTypographyDetail(group) {
+  currentGroup = group;
+  currentIndex = 0;
+  viewMode = "detail";
+  topBarContainer.innerHTML = "";
+  renderTypographyDetail();
+  selectCurrentNode();
+}
+
+function renderColorDetail() {
   const entry = currentGroup.nodePaints[currentIndex];
   const bg = paintToCss(entry.paint, entry.node);
 
@@ -265,23 +409,87 @@ function renderDetail() {
   `;
 }
 
+function renderTypographyDetail() {
+  const entry = currentGroup.nodeStyles[currentIndex];
+  const style = entry.style;
+  
+  const fontSizeStr = typeof style.fontSize === "number" ? style.fontSize : 16;
+  const fontWeightStr = typeof style.fontWeight === "number" ? style.fontWeight : 400;
+  const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeightStr);
+  
+  let lineHeightStr = "Auto";
+  if (typeof style.lineHeight === "object" && style.lineHeight.unit !== "AUTO") {
+    if (style.lineHeight.unit === "PIXELS") {
+      lineHeightStr = `${style.lineHeight.value}px`;
+    } else if (style.lineHeight.unit === "PERCENT") {
+      lineHeightStr = `${style.lineHeight.value}%`;
+    }
+  } else if (typeof style.lineHeight === "string") {
+    lineHeightStr = style.lineHeight;
+  }
+
+  const displayFontSize = typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
+  const displayFontWeight = typeof style.fontWeight === "number" ? style.fontWeight : style.fontWeight;
+
+  app.innerHTML = `
+    <div class="detail">
+      <div class="text-preview" style="font-family: '${style.fontFamily}', sans-serif; font-size: ${fontSizeStr}px; font-weight: ${cssFont.weight}; font-style: ${cssFont.style};">
+        The quick brown fox jumps
+      </div>
+      
+      <div class="text-info">
+        <strong>${style.fontFamily} ${style.fontStyle}</strong>
+        <div>Tamanho: ${displayFontSize}</div>
+        <div>Peso: ${displayFontWeight}</div>
+        <div>Altura da linha: ${lineHeightStr}</div>
+      </div>
+
+      <div>${currentIndex + 1} de ${currentGroup.nodeStyles.length}</div>
+
+      <div class="nav">
+        <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>◀</button>
+        <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>▶</button>
+      </div>
+
+      ${currentGroup.nodeStyles.length > 1
+        ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
+        : ""}
+
+      <div class="back" onclick="back()">Voltar para lista</div>
+    </div>
+  `;
+}
+
 function next() {
-  currentIndex = (currentIndex + 1) % currentGroup.nodePaints.length;
-  renderDetail();
+  const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+  currentIndex = (currentIndex + 1) % items.length;
+  
+  if (currentTab === "colors") {
+    renderColorDetail();
+  } else {
+    renderTypographyDetail();
+  }
   selectCurrentNode();
 }
 
 function prev() {
-  currentIndex = (currentIndex - 1 + currentGroup.nodePaints.length) % currentGroup.nodePaints.length;
-  renderDetail();
+  const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+  currentIndex = (currentIndex - 1 + items.length) % items.length;
+  
+  if (currentTab === "colors") {
+    renderColorDetail();
+  } else {
+    renderTypographyDetail();
+  }
   selectCurrentNode();
 }
 
 function selectAll() {
+  const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
   parent.postMessage({
     pluginMessage: {
       type: "select-multiple-nodes",
-      nodeIds: currentGroup.nodePaints.map(n => n.nodeId)
+      nodeIds: items.map(n => n.nodeId)
     }
   }, "*");
 }
@@ -289,7 +497,12 @@ function selectAll() {
 function back() {
   viewMode = "list";
   renderTopBar(true);
-  renderList(lastGroups);
+  
+  if (currentTab === "colors") {
+    renderColorList(lastGroups);
+  } else {
+    renderTypographyList(lastGroups);
+  }
 }
 </script>
 </body>

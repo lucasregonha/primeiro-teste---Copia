@@ -7,6 +7,7 @@ figma.showUI(__html__, { width: 360, height: 460 });
 let analyzedFrames: (FrameNode | ComponentNode | InstanceNode)[] = [];
 let selectingFromUI = false;
 let showHiddenElements = false;
+let currentTab: "colors" | "typography" = "colors";
 
 /* ---------- HELPERS ---------- */
 
@@ -31,12 +32,11 @@ function isGradientPaint(p: Paint): p is GradientPaint {
     );
 }
 
-// Prefixos válidos de tokens
+// Prefixos válidos de tokens de cor
 const VALID_TOKEN_PREFIXES = [
     "Base Color/",
     "Contextual Color/",
     "Base/",
-    //"Primary/",
     "Surface Colors/",
     "Content Colors/",
     "Brand Colors/"
@@ -84,11 +84,29 @@ async function hasValidColorToken(node: SceneNode, paint: Paint): Promise<boolea
     return false;
 }
 
-/* ---------- CORE ---------- */
+// Verifica se um nó de texto tem token de tipografia válido
+async function hasValidTextToken(node: TextNode): Promise<boolean> {
+    // Verifica se tem textStyleId aplicado
+    if (node.textStyleId && typeof node.textStyleId === "string" && node.textStyleId !== "") {
+        // Qualquer texto com style aplicado é considerado como tendo token
+        return true;
+    }
+    return false;
+}
+
+/* ---------- CORE - COLORS ---------- */
 
 async function analyzeFrames(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
     analyzedFrames = frames;
 
+    if (currentTab === "colors") {
+        await analyzeColors(frames);
+    } else {
+        await analyzeTypography(frames);
+    }
+}
+
+async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
     const map = new Map<string, { nodeId: string; paint: Paint; isStroke: boolean; node: SceneNode }[]>();
 
     async function processPaint(node: SceneNode, p: Paint, isStroke: boolean) {
@@ -140,7 +158,84 @@ async function analyzeFrames(frames: (FrameNode | ComponentNode | InstanceNode)[
         return { hex: firstPaint.type === "SOLID" ? rgbToHex(firstPaint.color) : "Gradiente", nodePaints };
     });
 
-    figma.ui.postMessage({ type: "result", groups });
+    figma.ui.postMessage({ type: "result-colors", groups });
+}
+
+/* ---------- CORE - TYPOGRAPHY ---------- */
+
+async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
+    const map = new Map<string, { nodeId: string; node: TextNode; style: CustomTextStyle }[]>();
+
+    async function processTextNode(node: TextNode) {
+        if (!showHiddenElements && !node.visible) return;
+        
+        // Verifica se tem token válido
+        if (await hasValidTextToken(node)) return;
+
+        // Pega propriedades do texto
+        const fontName = node.fontName !== figma.mixed ? node.fontName : { family: "Mixed", style: "Mixed" };
+        const fontSize = node.fontSize !== figma.mixed ? node.fontSize : "Mixed";
+        const fontWeight = node.fontWeight !== figma.mixed ? node.fontWeight : "Mixed";
+        const lineHeight = node.lineHeight !== figma.mixed ? node.lineHeight : "Auto";
+        const letterSpacing = node.letterSpacing !== figma.mixed ? node.letterSpacing : "0";
+
+        const style: CustomTextStyle = {
+            fontFamily: fontName.family,
+            fontStyle: fontName.style,
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            lineHeight: lineHeight,
+            letterSpacing: letterSpacing
+        };
+
+        // Cria chave única para agrupar apenas por família e estilo (Regular, Bold, Italic, etc)
+        const key = `${fontName.family}_${fontName.style}`;
+
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push({ nodeId: node.id, node, style });
+    }
+
+    async function walk(node: SceneNode): Promise<void> {
+        if (!showHiddenElements && !node.visible) return;
+
+        if (node.type === "TEXT") {
+            await processTextNode(node);
+        }
+
+        // Percorrer filhos
+        if ("children" in node) {
+            for (const c of node.children) {
+                if (isSceneNode(c)) await walk(c);
+            }
+        }
+    }
+
+    // Processar todos os frames
+    for (const frame of frames) {
+        await walk(frame);
+    }
+
+    const groups = Array.from(map.values()).map(nodeStyles => {
+        const first = nodeStyles[0].style;
+        return { 
+            style: first,
+            nodeStyles,
+            label: `${first.fontFamily} ${first.fontStyle}`
+        };
+    });
+
+    figma.ui.postMessage({ type: "result-typography", groups });
+}
+
+/* ---------- TYPES ---------- */
+
+interface CustomTextStyle {
+    fontFamily: string;
+    fontStyle: string;
+    fontSize: any;
+    fontWeight: any;
+    lineHeight: any;
+    letterSpacing: any;
 }
 
 /* ---------- EVENTS ---------- */
@@ -151,8 +246,11 @@ figma.on("selectionchange", () => {
         (n): n is FrameNode | ComponentNode | InstanceNode => 
             n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
     );
-    if (validNodes.length) analyzeFrames(validNodes);
-    else figma.ui.postMessage({ type: "empty" });
+    if (validNodes.length) {
+        analyzeFrames(validNodes);
+    } else {
+        figma.ui.postMessage({ type: "empty" });
+    }
 });
 
 // Mensagens vindas da UI
@@ -189,9 +287,15 @@ figma.ui.onmessage = async (msg) => {
         if (analyzedFrames.length) analyzeFrames(analyzedFrames);
     }
 
+    if (msg.type === "switch-tab") {
+        currentTab = msg.tab;
+        if (analyzedFrames.length) analyzeFrames(analyzedFrames);
+    }
+
     setTimeout(() => (selectingFromUI = false), 50);
 };
 
 /* ---------- INIT ---------- */
 figma.ui.postMessage({ type: "empty" });
+figma.ui.postMessage({ type: "init-tab", tab: currentTab });
 console.log("Plugin iniciado ✅");
