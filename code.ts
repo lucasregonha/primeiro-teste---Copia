@@ -93,9 +93,17 @@ async function hasValidTextToken(node: TextNode): Promise<boolean> {
     return false;
 }
 
+// Função helper para fazer yield e permitir UI updates
+function yieldToUI(): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 /* ---------- CORE - COLORS ---------- */
 
 async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
+    // Notifica que começou a análise (mostra spinner)
+    figma.ui.postMessage({ type: "analyzing-start" });
+    
     const map = new Map<string, { nodeId: string; paint: Paint; isStroke: boolean; node: SceneNode }[]>();
 
     async function processPaint(node: SceneNode, p: Paint, isStroke: boolean) {
@@ -114,8 +122,16 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
         map.get(key)!.push({ nodeId: node.id, paint: p, isStroke, node });
     }
 
+    let nodeCount = 0;
+
     async function walk(node: SceneNode): Promise<void> {
         if (!showHiddenElements && !node.visible) return;
+
+        nodeCount++;
+        // Yield a cada 300 nós para manter UI responsiva
+        if (nodeCount % 300 === 0) {
+            await yieldToUI();
+        }
 
         // Processar fills e strokes do nó atual
         if ("fills" in node && Array.isArray(node.fills)) {
@@ -153,6 +169,9 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
 /* ---------- CORE - TYPOGRAPHY ---------- */
 
 async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
+    // Notifica que começou a análise (mostra spinner)
+    figma.ui.postMessage({ type: "analyzing-start" });
+    
     const map = new Map<string, { nodeId: string; node: TextNode; style: CustomTextStyle }[]>();
 
     async function processTextNode(node: TextNode) {
@@ -184,8 +203,16 @@ async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNo
         map.get(key)!.push({ nodeId: node.id, node, style });
     }
 
+    let nodeCount = 0;
+
     async function walk(node: SceneNode): Promise<void> {
         if (!showHiddenElements && !node.visible) return;
+
+        nodeCount++;
+        // Yield a cada 300 nós para manter UI responsiva
+        if (nodeCount % 300 === 0) {
+            await yieldToUI();
+        }
 
         if (node.type === "TEXT") {
             await processTextNode(node);

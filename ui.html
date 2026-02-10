@@ -334,8 +334,45 @@ h4 + .app-wrapper-2 {
   color: rgba(24, 24, 27, 0.72);
 }
 
+/* Loading Spinner */
+.spinner-container {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  height: 346px;
+  width: 100%;
+}
 
+.spinner-container.show {
+  display: flex;
+}
 
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e0e0e0;
+  border-top: 3px solid #4361EE;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  box-sizing: border-box;
+}
+
+.spinner-text {
+  font-size: 13px;
+  color: #666;
+  font-family: "Inter", sans-serif;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 </style>
 </head>
@@ -349,9 +386,15 @@ h4 + .app-wrapper-2 {
 <div id="app"></div>
 <div id="top-bar-container"></div>
 
+<div class="spinner-container" id="spinner">
+  <div class="spinner"></div>
+  <div class="spinner-text">Carregando</div>
+</div>
+
 <script>
 const app = document.getElementById("app");
 const topBarContainer = document.getElementById("top-bar-container");
+const spinner = document.getElementById("spinner");
 
 let viewMode = "list";
 let currentGroup = null;
@@ -360,6 +403,32 @@ let showHidden = false;
 let currentTab = "colors";
 let lastColorGroups = [];
 let lastTypographyGroups = [];
+
+let loadingTimeout = null;
+
+// Funções para controlar o loading
+function showLoading() {
+  console.log("Mostrando spinner");
+  app.innerHTML = "";
+  topBarContainer.innerHTML = "";
+  
+  // Aguarda 0,3 segundo antes de realmente mostrar o spinner
+  loadingTimeout = setTimeout(() => {
+    spinner.classList.add("show");
+  }, 300);
+}
+
+function hideLoading() {
+  console.log("Escondendo spinner");
+  
+  // Limpa o timeout se o carregamento terminar antes de 0,3 segundo
+  if (loadingTimeout) {
+    clearTimeout(loadingTimeout);
+    loadingTimeout = null;
+  }
+  
+  spinner.classList.remove("show");
+}
 
 function switchTab(tab) {
   currentTab = tab;
@@ -377,13 +446,17 @@ function switchTab(tab) {
   viewMode = "list";
   currentGroup = null;
   
+  // Mostra loading
+  showLoading();
+  
   // Notifica o plugin
   parent.postMessage({ pluginMessage: { type: "switch-tab", tab } }, "*");
 }
 
 function renderTopBar(show) {
   topBarContainer.innerHTML = "";
-  if (!show || viewMode !== "list") return;
+  // Não mostra top bar se está carregando (spinner visível)
+  if (!show || viewMode !== "list" || spinner.classList.contains("show")) return;
 
   const div = document.createElement("div");
   div.className = "top-bar";
@@ -399,6 +472,7 @@ function renderTopBar(show) {
 
   div.querySelector("input").addEventListener("change", e => {
     showHidden = e.target.checked;
+    showLoading();
     parent.postMessage({ pluginMessage: { type: "toggle-hidden", value: showHidden } }, "*");
   });
 
@@ -468,26 +542,38 @@ function selectCurrentNode() {
 
 onmessage = e => {
   const msg = e.data.pluginMessage;
+  console.log("Mensagem recebida:", msg.type);
+  
+  // Começa análise - mostra spinner
+  if (msg.type === "analyzing-start") {
+    console.log("Iniciando análise...");
+    showLoading();
+    return;
+  }
   
   // Se clearAll for true, limpa TUDO e mostra empty
   if (msg.clearAll) {
     lastColorGroups = [];
     lastTypographyGroups = [];
     renderEmpty();
+    hideLoading();
     return;
   }
   
   if (msg.type === "empty") {
     renderEmpty();
+    hideLoading();
   }
   
   if (msg.type === "result-colors") {
     lastColorGroups = msg.groups;
+    hideLoading();
     renderColorList(msg.groups);
   }
   
   if (msg.type === "result-typography") {
     lastTypographyGroups = msg.groups;
+    hideLoading();
     renderTypographyList(msg.groups);
   }
   
@@ -561,7 +647,7 @@ function renderTypographyList(groups) {
   if (!groups.length) {
     app.innerHTML = `
     <div class="app-wrapper">
-      <h4>Elementos sem token aplicado:</h4>
+      <h4>Textos sem estilos aplicados:</h4>
       <div class="empty-2">
         <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAARtSURBVHgBzVlNbBtFFP5mvIbiKMHQH3GoXa9aIyKQ6oIEF1BdDnDpJVyoxIUiIU4QlxM5VElUCTiBI04IIcIBiV7IIb20l7iCS5FARoqUSiSyGyMh2kBNGrutvbvT98ZZN3Fde9Z1fj7J2p+Z2fnyvTfvzbwI9Ig/S/W0BXnUhUhDICWUiiogym0CKHsQRbrST+U9eJeTsXAOPUAE6VwoqKhjeRkJjPpkjCdSKNIlJ93apG0/UTQeZ9KJibmWN0G3o+gDiOy0KdGuBJf+cjNQGA+qWNeJSVEp1YR90Pq+Y79OjYslN4s+qfZQAgrZw/HQmYe2t3vZMKmaAVQa2wAFkV9zxIljtii3tsl2A4jc3HaRY9BKTw1qQR7EAwQbZlUpbDtUemnZ/bL17SYTLy4770KI77CDUB7OJA+Fsv5zk2Dhb5XwXDWnlEpgZ1G+5Ujb98emiT3XG98F5BjRoZA37j9oBVk91/EK6AOu33Bw9rN/9f177zyJV17ag15AKj7FKmoFWT30CfNXa6hUFU68GsHnU//p+14wZHk6/q6bmBJ+n1CpejiwL4RTbw3q65XfbqMX0J+V4avkXUm/fI/Ne+FiBS8MP94kOxCR6BFRvWOSkMd7M8JmzF5cw/mZW6SahbdHBjG/cFeb1z4URq8gbkctMm9KC/oI+PGnVVy4VMGpkSGcfHMAhWs1TZhNzEQZrKQdt3Bgv2X8XUqBaYuoJRAAbMZZIlNcriMRC+vPzP1yG+fG9jXVmr1UpXYXHCTOz6zpd5Vq4/nc2F5zVZVKiaWSezPIVuqDj//RKuzfKzWxgYjAJ6NPN/2uE3hVR0jJj943nq4sg5Bjc11fcfHh+gRM6usvnjEix0jEw7ix4iIAooGW2JXf72gy7Fu/0v3JNwa0glsJyQcc087sfzapwIuAV6ipcj54HI8PADKxEMYEmVSEFPOzQ1D1issOmTnIKqZjAW2586YDmFCVyPnEgqQx33+DqC7o6ColVM50AK9ensSPZZzG5q/e1RmjG7794X+8/lpE+685QZW3HHh/CJitFfafuZ9XUal4eP65x/DVN/e94+UX9+idC/9a0xsHcl69Y5lBBAFlkpy2lWksZKXOfrqCAvkSg83FMbBwrU4xsdo0YztwaGIFjUHH0iPxkO0T5HPvhOnY+YWavnJGaF0ofttGtOtnQHCaCJ5ubFgblYOb2EWoOzV7mCoP2lls2rnyARq7BaTe8HpZpOnN0pWTQYL2loF8r051G/+xSZBV9AQmsdOges3whqLSpniQPBjK7qSpFc19pKWY1HZpLZa8bS19MLg+k4zJY63v20bokCNGiLtxCnx0qBwXj9q1dAxOXCtRonG62iqwWZMdym8dcxzX7TylTlO9poj+o0zqZDqRY3RNws/Grel6iOQXmEafwKpx/eVwLDTVrW+g/LNAJZKwrkLQQT/4WZoVy646cqpdoRL9ILgRhZI6Tv9eSPOxVUGT5Z+/4SjTlyk78UJTOdqV5O2YuIwecA/A0uHIhF2qXAAAAABJRU5ErkJggg==" alt="Ilustração"/>
 
