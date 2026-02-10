@@ -374,6 +374,211 @@ h4 + .app-wrapper-2 {
   }
 }
 
+/* NEW STYLES FOR COLOR DETAIL */
+.detail-color-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.detail-color-container {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.detail-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 100px;
+}
+
+.detail-swatch-large {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  border: 2px solid #E4E4E7;
+}
+
+.detail-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #18181B;
+  align-self: flex-start;
+}
+
+.detail-info #hex-code {
+  font-size: 14px;
+  font-weight: 600;
+  color: #18181B;
+}
+
+.detail-info .type-label {
+  font-size: 12px;
+  color: rgba(24, 24, 27, 0.6);
+}
+
+.detail-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-nav button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #E4E4E7;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.detail-nav button:hover:not(:disabled) {
+  background: #F4F4F5;
+  border-color: #BFBFBF;
+}
+
+.detail-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nav-counter {
+  font-size: 12px;
+  color: rgba(24, 24, 27, 0.6);
+  width: 40px;
+  text-align: center;
+}
+
+.detail-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.detail-right h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #18181B;
+  margin: 0;
+  margin-bottom: 4px;
+}
+
+.tokens-container {
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  height: 273px;
+}
+
+.tokens-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.token-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px;
+  border-radius: 6px;
+  background: rgba(38, 39, 43, 0.08);
+  height: 28px;
+  cursor: pointer;
+  transition: all 0.2s;
+  justify-content: flex-start;
+}
+
+.token-item:hover {
+  background: rgba(24, 24, 27, 0.08);
+}
+
+.token-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid #E4E4E7;
+  flex-shrink: 0;
+}
+
+.token-name {
+  font-size: 12px;
+  color: #18181B;
+  font-weight: 500;
+}
+
+.detail-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 8px;
+  align-items: center;
+}
+
+.detail-footer .select-all {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid #E4E4E7;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.detail-footer .select-all:hover {
+  background: #F4F4F5;
+  border-color: #BFBFBF;
+}
+
+.detail-footer .back {
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 12px;
+  color: #4361EE;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.detail-footer .back:hover {
+  color: #2D41E3;
+  text-decoration: underline;
+}
+
+.container {
+  width: 100%;
+  display: flex;          
+  justify-content: center;  
+  align-items: center;   
+  flex-direction: column;
+  gap: 12px;
+}
+
 </style>
 </head>
 
@@ -722,25 +927,60 @@ function openTypographyDetail(group) {
 function renderColorDetail() {
   const entry = currentGroup.nodePaints[currentIndex];
   const bg = paintToCss(entry.paint, entry.node);
+  
+  // Tokens sugeridos baseados em tokens comuns de design
+  const suggestedTokens = [
+    { name: "Layout/Brand", color: "#2D41E3" },
+    { name: "Content/Brand", color: "#2D41E3" },
+    { name: "Layout/Primary", color: "#2D41E3" },
+    { name: "Interactive/Primary", color: "#2D41E3" },
+    { name: "Interactive/Primary Hover", color: "#2D41E3" }
+  ];
 
   app.innerHTML = `
-    <div class="detail">
-      <div class="detail-swatch" style="background:${bg}"></div>
-      <div id="hex-code">${currentGroup.hex}</div>
-      <div class="type-label">${entry.isStroke ? "Stroke" : "Fill"}</div>
+    <div class="detail-color-wrapper">
+      <div class="detail-color-container">
+        <div class="detail-left">
+          <h4>Cor:</h4>
+          <div class="container">
+            <div class="detail-swatch-large" style="background:${bg}"></div>  
+          
+            <div class="detail-info">
+              <div id="hex-code">${currentGroup.hex}</div>
+              <div class="type-label">(${entry.isStroke ? "stroke" : "fill"})</div>
+            </div>
+            
+            <div class="detail-nav">
+              <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>◀</button>
+              <span class="nav-counter">${currentIndex + 1} de ${currentGroup.nodePaints.length}</span>
+              <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>▶</button>
+              </div>
+              
+            ${currentGroup.nodePaints.length > 1
+            ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
+            : ""}
+              
+          </div>
+        </div>
 
-      <div>${currentIndex + 1} de ${currentGroup.nodePaints.length}</div>
-
-      <div class="nav">
-        <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>◀</button>
-        <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>▶</button>
+        <div class="detail-right">
+          <h4>Tokens sugeridos:</h4>
+          <div class="tokens-container">
+            <div class="tokens-list">
+              ${suggestedTokens.map((token, idx) => `
+                <div class="token-item">
+                  <div class="token-swatch" style="background:${token.color}"></div>
+                  <span class="token-name">${token.name}</span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
       </div>
 
-      ${currentGroup.nodePaints.length > 1
-        ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
-        : ""}
-
-      <div class="back" onclick="back()">Voltar para lista</div>
+      <div class="detail-footer">
+        <h4 class="back" onclick="back()">Voltar para a lista<h4>
+      </div>
     </div>
   `;
 }
