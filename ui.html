@@ -415,7 +415,7 @@ h4 + .app-wrapper-2 {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  min-width: 100px;
+  width: 110px;
 }
 
 .detail-swatch-large {
@@ -443,6 +443,11 @@ h4 + .app-wrapper-2 {
   font-size: 14px;
   font-weight: 600;
   color: #18181B;
+  width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
 }
 
 .detail-info .type-label {
@@ -1191,7 +1196,7 @@ function renderTypographyDetail() {
                     `).join("")}
                   </div>`
                 : `<div class="empty-state-tokens">
-                    Sem estilos de texto para sugerir.
+                    Sem estilos de fonte para sugerir.
                   </div>`
             }
           </div>

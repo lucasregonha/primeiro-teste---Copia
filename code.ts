@@ -433,6 +433,7 @@ figma.ui.onmessage = async (msg) => {
             console.error("Erro ao aplicar token:", err);
         }
     }
+    
 
     if (msg.type === "toggle-hidden") {
         showHiddenElements = msg.value;
