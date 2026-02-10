@@ -415,7 +415,7 @@ h4 + .app-wrapper-2 {
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  width: 110px;
+  width: 120px;
 }
 
 .detail-swatch-large {
@@ -429,7 +429,7 @@ h4 + .app-wrapper-2 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: space-between;
 }
 
 .detail-label {
@@ -443,7 +443,7 @@ h4 + .app-wrapper-2 {
   font-size: 14px;
   font-weight: 600;
   color: #18181B;
-  width: 110px;
+  width: 120px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -458,7 +458,8 @@ h4 + .app-wrapper-2 {
 .detail-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
+  width: 100%;
+  justify-content: space-between;
 }
 
 
@@ -466,7 +467,7 @@ h4 + .app-wrapper-2 {
 .nav-counter {
   font-size: 12px;
   color: rgba(24, 24, 27, 0.6);
-  width: 40px;
+  width: 60px;
   text-align: center;
 }
 
@@ -933,8 +934,9 @@ function renderColorList(groups) {
               </div>
 
               <div class="group-info-bottom">
-                ${g.nodePaints.length} elementos
+                ${g.nodePaints.length} ${g.nodePaints.length === 1 ? "elemento" : "elementos"}
               </div>
+
             </div>
           </div>
         `;
@@ -993,9 +995,11 @@ function renderTypographyList(groups) {
             <div class="group-info-top">
               <strong class="hex">${style.fontFamily}</strong>
             </div>
+
             <div class="group-info-bottom">
-              ${g.nodeStyles.length} elementos
+              ${g.nodeStyles.length} ${g.nodeStyles.length === 1 ? "elemento" : "elementos"}
             </div>
+
           </div>
         </div>
       `;
@@ -1053,7 +1057,7 @@ function renderColorDetail() {
               <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
               <span class="nav-counter">${currentIndex + 1} de ${currentGroup.nodePaints.length}</span>
               <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
-              </div>
+            </div>
               
             ${currentGroup.nodePaints.length > 1
             ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
@@ -1072,7 +1076,6 @@ function renderColorDetail() {
                       <div class="token-swatch" style="background:${token.hex}"></div>
                       <div style="flex: 1; min-width: 0;">
                         <div class="token-name">${token.name}</div>
-                        <div class="token-info-small">${token.hex}</div>
                       </div>
                     </div>
                   `).join("")}
