@@ -278,10 +278,29 @@ input:checked + .slider:before {
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s;
+  position: relative;
 }
 
 .group:hover {
   background: rgba(112, 112, 123, 0.16);
+}
+
+.group::after {
+  content: "Ver mais";
+  position: absolute;
+  right: 8px;
+  bottom: 10px;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(24, 24, 27, 0.72);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.group:hover::after {
+  opacity: 1;
 }
 
 .swatch-large {
@@ -616,8 +635,8 @@ h4 + .app-wrapper-2 {
 }
 
 .detail-nav button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  opacity: 0.33;
+  cursor: default;
 }
 
 .back-button {
@@ -961,13 +980,13 @@ function renderTypographyList(groups) {
             color: #18181B;
             background-color: white;
           ">
-            Aa
+            Ag
           </div>
 
           <!-- Informações da fonte -->
           <div class="group-info">
             <div class="group-info-top">
-              <strong class="hex">${style.fontFamily} ${style.fontStyle}</strong>
+              <strong class="hex">${style.fontFamily}</strong>
             </div>
             <div class="group-info-bottom">
               ${g.nodeStyles.length} elementos
@@ -1071,11 +1090,10 @@ function renderColorDetail() {
 function renderTypographyDetail() {
   const entry = currentGroup.nodeStyles[currentIndex];
   const style = entry.style;
-  
-  const fontSizeStr = typeof style.fontSize === "number" ? style.fontSize : 16;
-  const fontWeightStr = typeof style.fontWeight === "number" ? style.fontWeight : 400;
-  const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeightStr);
-  
+
+  const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
+  const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
+
   let lineHeightStr = "Auto";
   if (typeof style.lineHeight === "object" && style.lineHeight.unit !== "AUTO") {
     if (style.lineHeight.unit === "PIXELS") {
@@ -1083,41 +1101,117 @@ function renderTypographyDetail() {
     } else if (style.lineHeight.unit === "PERCENT") {
       lineHeightStr = `${style.lineHeight.value}%`;
     }
-  } else if (typeof style.lineHeight === "string") {
-    lineHeightStr = style.lineHeight;
   }
 
-  const displayFontSize = typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
-  const displayFontWeight = typeof style.fontWeight === "number" ? style.fontWeight : style.fontWeight;
+  const displayFontSize =
+    typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
 
   app.innerHTML = `
-    <div class="detail">
-      <div class="text-preview" style="font-family: '${style.fontFamily}', sans-serif; font-size: 32px; font-weight: ${cssFont.weight}; font-style: ${cssFont.style};">
-        Ag
+    <div class="detail-color-wrapper">
+      <div class="detail-color-container">
+
+        <!-- ESQUERDA (igual cor) -->
+        <div class="detail-left">
+          <h4>Fonte:</h4>
+
+          <div class="container">
+            <div
+              class="detail-swatch-large"
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: '${style.fontFamily}', sans-serif;
+                font-size: 28px;
+                font-weight: ${cssFont.weight};
+                font-style: ${cssFont.style};
+                background: white;
+                color: #18181B;
+              "
+            >
+              Ag
+            </div>
+
+            <div class="detail-info">
+              <div id="hex-code">${style.fontFamily}</div>
+              <div class="type-label">
+                ${style.fontStyle} ${displayFontSize}
+              </div>
+            </div>
+
+
+
+            <div class="detail-nav">
+              <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+
+              <span class="nav-counter">
+                ${currentIndex + 1} de ${currentGroup.nodeStyles.length}
+              </span>
+
+              <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            </div>
+
+            ${
+              currentGroup.nodeStyles.length > 1
+                ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
+                : ""
+            }
+          </div>
+        </div>
+
+        <!-- DIREITA (infos da fonte) -->
+        <div class="detail-right">
+          <h4>Estilos sugeridos:</h4>
+
+          <div class="tokens-container">
+            ${
+              appliedTokens && appliedTokens.length > 0
+                ? `<div class="tokens-list">
+                    ${appliedTokens.map(token => `
+                      <div
+                        class="token-item"
+                        onclick='applyToken("${entry.nodeId}", "${token.styleId || ""}", false)'
+                        title="${token.name}"
+                      >
+                        <div style="flex: 1; min-width: 0;">
+                          <div class="token-name">${token.name}</div>
+                          <div class="token-info-small">
+                            ${token.fontStyle} ${token.fontSize}px
+                          </div>
+                        </div>
+                      </div>
+                    `).join("")}
+                  </div>`
+                : `<div class="empty-state-tokens">
+                    Sem estilos de texto para sugerir.
+                  </div>`
+            }
+          </div>
+        </div>
+
+
       </div>
-      
-      <div class="text-info">
-        <strong>${style.fontFamily} ${style.fontStyle}</strong>
-        <div>Tamanho: ${displayFontSize}</div>
-        <div>Peso: ${displayFontWeight}</div>
-        <div>Altura da linha: ${lineHeightStr}</div>
+
+      <div class="detail-footer">
+        <button class="back-button" onclick="back()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+          Voltar para a lista
+        </button>
       </div>
-
-      <div>${currentIndex + 1} de ${currentGroup.nodeStyles.length}</div>
-
-      <div class="nav">
-        <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
-        <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
-      </div>
-
-      ${currentGroup.nodeStyles.length > 1
-        ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
-        : ""}
-
-      <button class="back-button" onclick="back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg> Voltar para a lista</button>
     </div>
   `;
 }
+
 
 function next() {
   const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
