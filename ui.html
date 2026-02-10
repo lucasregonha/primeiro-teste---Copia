@@ -469,6 +469,7 @@ h4 + .app-wrapper-2 {
   color: rgba(24, 24, 27, 0.6);
   width: 60px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .detail-right {
@@ -619,6 +620,7 @@ h4 + .app-wrapper-2 {
   width: 20px;
   height: 20px;
   stroke: currentColor;
+  flex-shrink: 0;
 }
 
 .detail-nav button {
@@ -865,21 +867,40 @@ function selectCurrentNode() {
 
 function toggleSelectAll(checked) {
   isSelectAllMode = checked;
-  
-  if (isSelectAllMode) {
-    // Selecionar todos
-    const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
-    parent.postMessage({
-      pluginMessage: {
-        type: "select-multiple-nodes",
-        nodeIds: items.map(n => n.nodeId)
-      }
-    }, "*");
+
+  const items =
+    currentTab === "colors"
+      ? currentGroup.nodePaints
+      : currentGroup.nodeStyles;
+
+  if (checked) {
+    parent.postMessage(
+      {
+        pluginMessage: {
+          type: "select-multiple-nodes",
+          nodeIds: items.map(n => n.nodeId)
+        }
+      },
+      "*"
+    );
+
+    currentIndex = items.length - 1;
   } else {
-    // Voltar para seleção individual
+    currentIndex = 0;
+
+
     selectCurrentNode();
   }
+
+
+  if (currentTab === "colors") {
+    renderColorDetail();
+  } else {
+    renderTypographyDetail();
+  }
 }
+
+
 
 onmessage = e => {
   const msg = e.data.pluginMessage;
@@ -1101,10 +1122,42 @@ function renderColorDetail() {
             </div>
             
             <div class="detail-nav">
-              <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
-              <span class="nav-counter">${currentIndex + 1} de ${currentGroup.nodePaints.length}</span>
-              <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
+              <button
+                onclick="prev()"
+                class="${isSelectAllMode ? "nav-disabled" : ""}"
+                ${currentGroup.nodePaints.length <= 1 || isSelectAllMode ? "disabled" : ""}
+              >
+
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                  stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+
+              <span class="nav-counter">
+                ${
+                  isSelectAllMode
+                    ? `${currentGroup.nodePaints.length} de ${currentGroup.nodePaints.length}`
+                    : `${currentIndex + 1} de ${currentGroup.nodePaints.length}`
+                }
+              </span>
+
+
+              <button
+                onclick="next()"
+                class="${isSelectAllMode ? "nav-disabled" : ""}"
+                ${currentGroup.nodePaints.length <= 1 || isSelectAllMode ? "disabled" : ""}
+              >
+
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                  stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
             </div>
+
               
             ${currentGroup.nodePaints.length > 1
             ? `<label class="select-all-checkbox">
@@ -1200,28 +1253,43 @@ function renderTypographyDetail() {
 
 
             <div class="detail-nav">
-              <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+              <button
+                onclick="prev()"
+                ${currentGroup.nodeStyles.length <= 1 || isSelectAllMode ? "disabled" : ""}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                  stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M15.75 19.5 8.25 12l7.5-7.5" />
                 </svg>
               </button>
 
               <span class="nav-counter">
-                ${currentIndex + 1} de ${currentGroup.nodeStyles.length}
+                ${
+                  isSelectAllMode
+                    ? `${currentGroup.nodeStyles.length} de ${currentGroup.nodeStyles.length}`
+                    : `${currentIndex + 1} de ${currentGroup.nodeStyles.length}`
+                }
               </span>
 
-              <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+              <button
+                onclick="next()"
+                ${currentGroup.nodeStyles.length <= 1 || isSelectAllMode ? "disabled" : ""}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                  stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                 </svg>
               </button>
             </div>
+
 
             ${
               currentGroup.nodeStyles.length > 1
                 ? `<label class="select-all-checkbox">
                     <input type="checkbox" ${isSelectAllMode ? "checked" : ""} onchange="toggleSelectAll(this.checked)">
-                    <span>Selecionar todos</span>
+                    <span>Selec. todos</span>
                   </label>`
                 : ""
             }
@@ -1275,34 +1343,48 @@ function renderTypographyDetail() {
 
 
 function next() {
-  const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+  if (isSelectAllMode) {
+    return;
+  }
+
+  const items =
+    currentTab === "colors"
+      ? currentGroup.nodePaints
+      : currentGroup.nodeStyles;
+
   currentIndex = (currentIndex + 1) % items.length;
-  
+
   if (currentTab === "colors") {
     renderColorDetail();
   } else {
     renderTypographyDetail();
   }
-  
-  if (!isSelectAllMode) {
-    selectCurrentNode();
-  }
+
+  selectCurrentNode();
 }
 
+
 function prev() {
-  const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+  if (isSelectAllMode) {
+    return;
+  }
+
+  const items =
+    currentTab === "colors"
+      ? currentGroup.nodePaints
+      : currentGroup.nodeStyles;
+
   currentIndex = (currentIndex - 1 + items.length) % items.length;
-  
+
   if (currentTab === "colors") {
     renderColorDetail();
   } else {
     renderTypographyDetail();
   }
-  
-  if (!isSelectAllMode) {
-    selectCurrentNode();
-  }
+
+  selectCurrentNode();
 }
+
 
 function applyToken(nodeId, styleId, isStroke) {
   if (!styleId) {
