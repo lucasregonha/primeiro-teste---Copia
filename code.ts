@@ -206,7 +206,11 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
         if (p.type === "SOLID" && await hasValidColorToken(node, p)) return;
 
         let key: string;
-        if (p.type === "SOLID") key = `SOLID_${rgbToHex(p.color)}_${p.opacity != null ? p.opacity : 1}`;
+        if (p.type === "SOLID") {
+            const source = isStroke ? "STROKE" : "FILL";
+            key = `${source}_SOLID_${rgbToHex(p.color)}_${p.opacity != null ? p.opacity : 1}`;
+        }
+
         else if (isGradientPaint(p)) key = `GRADIENT_${JSON.stringify(p.gradientStops)}`;
         else return;
 
