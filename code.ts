@@ -96,8 +96,8 @@ function yieldToUI(): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, 0));
 }
 
-// Percorre nó recursivamente coletando tokens
-async function walkForTokens(node: SceneNode, tokenSet: Map<string, { name: string; hex: string; styleId?: string }>): Promise<void> {
+// Percorre nó recursivamente coletando tokens de COR
+async function walkForColorTokens(node: SceneNode, tokenSet: Map<string, { name: string; hex: string; styleId?: string }>): Promise<void> {
     if (!showHiddenElements && !node.visible) return;
 
     // Processa fills
@@ -149,43 +149,178 @@ async function walkForTokens(node: SceneNode, tokenSet: Map<string, { name: stri
     // Percorre filhos recursivamente
     if ("children" in node) {
         for (const c of node.children) {
-            if (isSceneNode(c)) await walkForTokens(c, tokenSet);
+            if (isSceneNode(c)) await walkForColorTokens(c, tokenSet);
         }
     }
 }
 
-// Coleta tokens de cor aplicados - busca em 3 níveis
+// Percorre nó recursivamente coletando tokens de TIPOGRAFIA
+async function walkForTextTokens(node: SceneNode, tokenSet: Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>): Promise<void> {
+    if (!showHiddenElements && !node.visible) return;
+
+    // Processa texto
+    if (node.type === "TEXT") {
+        const textNode = node as TextNode;
+        if (textNode.textStyleId && typeof textNode.textStyleId === "string" && textNode.textStyleId !== "") {
+            try {
+                const style = await figma.getStyleByIdAsync(textNode.textStyleId);
+                if (style && style.type === "TEXT") {
+                    const key = style.id;
+                    
+                    // Extrai informações do estilo
+                    const fontName = textNode.fontName !== figma.mixed ? textNode.fontName : { family: "Mixed", style: "Mixed" };
+                    const fontSize = textNode.fontSize !== figma.mixed ? textNode.fontSize : undefined;
+                    
+                    tokenSet.set(key, { 
+                        name: style.name, 
+                        styleId: style.id,
+                        fontFamily: fontName.family,
+                        fontStyle: fontName.style,
+                        fontSize: fontSize
+                    });
+                }
+            } catch (e) {
+                // Style não encontrado
+            }
+        }
+    }
+
+    // Percorre filhos recursivamente
+    if ("children" in node) {
+        for (const c of node.children) {
+            if (isSceneNode(c)) await walkForTextTokens(c, tokenSet);
+        }
+    }
+}
+
+// Coleta tokens de cor aplicados - busca em TODA a página E estilos locais
 async function collectAppliedColorTokens(frames: (FrameNode | ComponentNode | InstanceNode)[]): Promise<{ name: string; hex: string; styleId?: string }[]> {
     const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
 
-    // 1️⃣ Nível 1: Frame selecionado e seus filhos
-    for (const frame of frames) {
-        await walkForTokens(frame, tokenSet);
+    // 🔥 PRIMEIRO: Busca todos os estilos locais disponíveis no documento
+    const localStyles = await figma.getLocalPaintStylesAsync();
+    for (const style of localStyles) {
+        // Verifica se tem prefixo válido
+        if (VALID_TOKEN_PREFIXES.some(prefix => style.name.startsWith(prefix))) {
+            // Verifica se é um estilo SOLID
+            if (style.paints && style.paints.length > 0) {
+                const firstPaint = style.paints[0];
+                if (firstPaint.type === "SOLID") {
+                    const hex = rgbToHex(firstPaint.color);
+                    const key = `${style.name}_${hex}`;
+                    tokenSet.set(key, { name: style.name, hex, styleId: style.id });
+                }
+            }
+        }
     }
 
-    // 2️⃣ Nível 2: Pais do frame
+    // 1️⃣ Nível 1: Frame selecionado e seus filhos
+    for (const frame of frames) {
+        await walkForColorTokens(frame, tokenSet);
+    }
+
+    // 2️⃣ Nível 2: Todos os pais do frame até a raiz
     const parentsAnalyzed = new Set<string>();
     for (const frame of frames) {
         let current: BaseNode | null = frame.parent;
-        while (current && !parentsAnalyzed.has(current.id)) {
-            if (isSceneNode(current)) {
-                await walkForTokens(current, tokenSet);
+        while (current && current.type !== "PAGE") {
+            if (!parentsAnalyzed.has(current.id)) {
+                if (isSceneNode(current)) {
+                    await walkForColorTokens(current, tokenSet);
+                }
+                parentsAnalyzed.add(current.id);
             }
-            parentsAnalyzed.add(current.id);
             current = current.parent;
         }
     }
 
-    // 3️⃣ Nível 3: Irmãos (filhos do parent)
+    // 3️⃣ Nível 3: Todos os irmãos em cada nível da hierarquia
     const siblingsAnalyzed = new Set<string>();
     for (const frame of frames) {
-        if (frame.parent && "children" in frame.parent) {
-            for (const sibling of frame.parent.children) {
-                if (isSceneNode(sibling) && !siblingsAnalyzed.has(sibling.id)) {
-                    await walkForTokens(sibling, tokenSet);
-                    siblingsAnalyzed.add(sibling.id);
+        let current: BaseNode | null = frame;
+        while (current && current.type !== "PAGE") {
+            if (current.parent && "children" in current.parent) {
+                for (const sibling of current.parent.children) {
+                    if (isSceneNode(sibling) && !siblingsAnalyzed.has(sibling.id)) {
+                        await walkForColorTokens(sibling, tokenSet);
+                        siblingsAnalyzed.add(sibling.id);
+                    }
                 }
             }
+            current = current.parent;
+        }
+    }
+
+    // 4️⃣ Nível 4: Busca na página inteira como fallback
+    const pageChildren = figma.currentPage.children;
+    for (const child of pageChildren) {
+        if (isSceneNode(child) && !siblingsAnalyzed.has(child.id)) {
+            await walkForColorTokens(child, tokenSet);
+        }
+    }
+
+    return Array.from(tokenSet.values());
+}
+
+// Coleta tokens de tipografia aplicados - busca em TODA a página E estilos locais
+async function collectAppliedTextTokens(frames: (FrameNode | ComponentNode | InstanceNode)[]): Promise<{ name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[]> {
+    const tokenSet = new Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>();
+
+    // 🔥 PRIMEIRO: Busca todos os estilos de texto locais disponíveis no documento
+    const localStyles = await figma.getLocalTextStylesAsync();
+    for (const style of localStyles) {
+        const key = style.id;
+        tokenSet.set(key, { 
+            name: style.name, 
+            styleId: style.id,
+            fontFamily: style.fontName ? style.fontName.family : undefined,
+            fontStyle: style.fontName ? style.fontName.style : undefined,
+            fontSize: style.fontSize
+        });
+    }
+
+    // 1️⃣ Nível 1: Frame selecionado e seus filhos
+    for (const frame of frames) {
+        await walkForTextTokens(frame, tokenSet);
+    }
+
+    // 2️⃣ Nível 2: Todos os pais do frame até a raiz
+    const parentsAnalyzed = new Set<string>();
+    for (const frame of frames) {
+        let current: BaseNode | null = frame.parent;
+        while (current && current.type !== "PAGE") {
+            if (!parentsAnalyzed.has(current.id)) {
+                if (isSceneNode(current)) {
+                    await walkForTextTokens(current, tokenSet);
+                }
+                parentsAnalyzed.add(current.id);
+            }
+            current = current.parent;
+        }
+    }
+
+    // 3️⃣ Nível 3: Todos os irmãos em cada nível da hierarquia
+    const siblingsAnalyzed = new Set<string>();
+    for (const frame of frames) {
+        let current: BaseNode | null = frame;
+        while (current && current.type !== "PAGE") {
+            if (current.parent && "children" in current.parent) {
+                for (const sibling of current.parent.children) {
+                    if (isSceneNode(sibling) && !siblingsAnalyzed.has(sibling.id)) {
+                        await walkForTextTokens(sibling, tokenSet);
+                        siblingsAnalyzed.add(sibling.id);
+                    }
+                }
+            }
+            current = current.parent;
+        }
+    }
+
+    // 4️⃣ Nível 4: Busca na página inteira como fallback
+    const pageChildren = figma.currentPage.children;
+    for (const child of pageChildren) {
+        if (isSceneNode(child) && !siblingsAnalyzed.has(child.id)) {
+            await walkForTextTokens(child, tokenSet);
         }
     }
 
@@ -400,25 +535,36 @@ figma.ui.onmessage = async (msg) => {
             );
             
             if (validNodes.length > 0) {
-                const appliedTokens = await collectAppliedColorTokens(validNodes);
-                figma.ui.postMessage({ type: "result-suggested-tokens", tokens: appliedTokens });
+                if (currentTab === "colors") {
+                    const appliedTokens = await collectAppliedColorTokens(validNodes);
+                    figma.ui.postMessage({ type: "result-suggested-tokens", tokens: appliedTokens });
+                } else {
+                    const appliedTokens = await collectAppliedTextTokens(validNodes);
+                    figma.ui.postMessage({ type: "result-suggested-text-tokens", tokens: appliedTokens });
+                }
+            } else {
+                figma.ui.postMessage({ type: "result-suggested-tokens", tokens: [] });
             }
         } catch (err) {
             console.error("Erro ao buscar tokens sugeridos:", err);
+            figma.ui.postMessage({ type: "result-suggested-tokens", tokens: [] });
         }
     }
 
     if (msg.type === "apply-token") {
         try {
-            ignoringSelectionChange = true;
             const nodeId = msg.nodeId;
             const styleId = msg.styleId;
             const isStroke = msg.isStroke;
+            const isText = msg.isText || false;
 
             const node = await figma.getNodeByIdAsync(nodeId);
             if (!node || !isSceneNode(node)) return;
 
-            if (isStroke && "strokes" in node) {
+            if (isText && node.type === "TEXT") {
+                // Aplica estilo de texto
+                node.textStyleId = styleId;
+            } else if (isStroke && "strokes" in node) {
                 node.strokes = [];
                 node.strokeStyleId = styleId;
             } else if (!isStroke && "fills" in node) {
@@ -426,12 +572,18 @@ figma.ui.onmessage = async (msg) => {
                 node.fillStyleId = styleId;
             }
 
+            // Reanalisa após aplicar o token
             const validNodes = figma.currentPage.selection.filter(
                 (n): n is FrameNode | ComponentNode | InstanceNode => 
                     n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
             );
+            
             if (validNodes.length > 0) {
-                analyzeColors(validNodes);
+                if (currentTab === "colors") {
+                    await analyzeColors(validNodes);
+                } else {
+                    await analyzeTypography(validNodes);
+                }
             }
         } catch (err) {
             console.error("Erro ao aplicar token:", err);

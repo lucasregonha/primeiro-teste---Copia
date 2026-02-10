@@ -362,12 +362,19 @@ h4 + .app-wrapper-2 {
   justify-content: center;
   align-items: center;
   gap: 16px;
-  height: 346px;
-  width: 100%;
+  position: fixed;
+  top: 62px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  background-color: #F4F4F5;
+  z-index: 100;
+  pointer-events: none;
 }
 
 .spinner-container.show {
   display: flex;
+  pointer-events: auto;
 }
 
 .spinner {
@@ -697,6 +704,26 @@ h4 + .app-wrapper-2 {
   cursor: pointer;
   accent-color: #4361EE;
 }
+
+/* Loading inline para tokens */
+.tokens-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+}
+
+.tokens-loading .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+.tokens-loading .spinner-text {
+  font-size: 11px;
+}
 </style>
 </head>
 
@@ -728,6 +755,7 @@ let lastColorGroups = [];
 let lastTypographyGroups = [];
 let appliedTokens = [];
 let isSelectAllMode = false;
+let isLoadingTokens = false;
 
 let loadingTimeout = null;
 
@@ -737,7 +765,7 @@ function showLoading() {
   app.innerHTML = "";
   topBarContainer.innerHTML = "";
   
-  // Aguarda 0,3 segundo antes de realmente mostrar o spinner
+  // Aguarda 300ms antes de realmente mostrar o spinner
   loadingTimeout = setTimeout(() => {
     spinner.classList.add("show");
   }, 300);
@@ -746,7 +774,7 @@ function showLoading() {
 function hideLoading() {
   console.log("Escondendo spinner");
   
-  // Limpa o timeout se o carregamento terminar antes de 0,3 segundo
+  // Limpa o timeout se o carregamento terminar antes de 300ms
   if (loadingTimeout) {
     clearTimeout(loadingTimeout);
     loadingTimeout = null;
@@ -770,6 +798,7 @@ function switchTab(tab) {
   // Reseta view
   viewMode = "list";
   currentGroup = null;
+  appliedTokens = [];
   
   // Mostra loading
   showLoading();
@@ -780,8 +809,8 @@ function switchTab(tab) {
 
 function renderTopBar(show) {
   topBarContainer.innerHTML = "";
-  // Não mostra top bar se está carregando (spinner visível)
-  if (!show || viewMode !== "list" || spinner.classList.contains("show")) return;
+  // Não mostra top bar se não deve mostrar ou não está em modo lista
+  if (!show || viewMode !== "list") return;
 
   const div = document.createElement("div");
   div.className = "top-bar";
@@ -887,11 +916,8 @@ function toggleSelectAll(checked) {
     currentIndex = items.length - 1;
   } else {
     currentIndex = 0;
-
-
     selectCurrentNode();
   }
-
 
   if (currentTab === "colors") {
     renderColorDetail();
@@ -930,13 +956,26 @@ onmessage = e => {
   
   if (msg.type === "result-colors") {
     lastColorGroups = msg.groups;
-    hideLoading();
     renderColorList(msg.groups);
+    // Garante que o loading seja escondido após a renderização
+    setTimeout(() => hideLoading(), 0);
   }
 
   if (msg.type === "result-suggested-tokens") {
     appliedTokens = msg.tokens || [];
+    isLoadingTokens = false;
+    console.log("Tokens recebidos:", appliedTokens.length);
     renderColorDetail();
+    if (!isSelectAllMode) {
+      selectCurrentNode();
+    }
+  }
+
+  if (msg.type === "result-suggested-text-tokens") {
+    appliedTokens = msg.tokens || [];
+    isLoadingTokens = false;
+    console.log("Tokens de texto recebidos:", appliedTokens.length);
+    renderTypographyDetail();
     if (!isSelectAllMode) {
       selectCurrentNode();
     }
@@ -944,8 +983,9 @@ onmessage = e => {
   
   if (msg.type === "result-typography") {
     lastTypographyGroups = msg.groups;
-    hideLoading();
     renderTypographyList(msg.groups);
+    // Garante que o loading seja escondido após a renderização
+    setTimeout(() => hideLoading(), 0);
   }
   
   if (msg.type === "init-tab") {
@@ -1079,11 +1119,13 @@ function openDetail(group) {
   currentGroup = group;
   currentIndex = 0;
   isSelectAllMode = false;
+  isLoadingTokens = true;
   viewMode = "detail";
   topBarContainer.innerHTML = "";
+  appliedTokens = [];
   
-  // Mostra loading enquanto busca tokens
-  app.innerHTML = `<div class="spinner-container show"><div class="spinner"></div><div class="spinner-text">Carregando sugestões</div></div>`;
+  // Renderiza a tela com loading de tokens
+  renderColorDetail();
   
   // Solicita tokens ao backend
   parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
@@ -1093,20 +1135,24 @@ function openTypographyDetail(group) {
   currentGroup = group;
   currentIndex = 0;
   isSelectAllMode = false;
+  isLoadingTokens = true;
   viewMode = "detail";
   topBarContainer.innerHTML = "";
+  appliedTokens = [];
+  
+  // Renderiza a tela com loading de tokens
   renderTypographyDetail();
+  
+  // Solicita tokens ao backend
+  parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
+  
+  // Seleciona o nó atual
   selectCurrentNode();
 }
 
 function renderColorDetail() {
   const entry = currentGroup.nodePaints[currentIndex];
   const bg = paintToCss(entry.paint, entry.node);
-  
-  // Tokens aplicados nos frames (dinâmico)
-  const suggestedTokens = appliedTokens && appliedTokens.length > 0 
-    ? appliedTokens 
-    : [];
 
   app.innerHTML = `
     <div class="detail-color-wrapper">
@@ -1124,10 +1170,8 @@ function renderColorDetail() {
             <div class="detail-nav">
               <button
                 onclick="prev()"
-                class="${isSelectAllMode ? "nav-disabled" : ""}"
                 ${currentGroup.nodePaints.length <= 1 || isSelectAllMode ? "disabled" : ""}
               >
-
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                   stroke-width="1.5" stroke="currentColor" class="nav-icon">
                   <path stroke-linecap="round" stroke-linejoin="round"
@@ -1143,13 +1187,10 @@ function renderColorDetail() {
                 }
               </span>
 
-
               <button
                 onclick="next()"
-                class="${isSelectAllMode ? "nav-disabled" : ""}"
                 ${currentGroup.nodePaints.length <= 1 || isSelectAllMode ? "disabled" : ""}
               >
-
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                   stroke-width="1.5" stroke="currentColor" class="nav-icon">
                   <path stroke-linecap="round" stroke-linejoin="round"
@@ -1157,7 +1198,6 @@ function renderColorDetail() {
                 </svg>
               </button>
             </div>
-
               
             ${currentGroup.nodePaints.length > 1
             ? `<label class="select-all-checkbox">
@@ -1165,34 +1205,44 @@ function renderColorDetail() {
                 <span>Selec. todos</span>
               </label>`
             : ""}
-              
           </div>
         </div>
 
         <div class="detail-right">
           <h4>Tokens sugeridos:</h4>
           <div class="tokens-container">
-            ${suggestedTokens.length > 0 
-              ? `<div class="tokens-list">
-                  ${suggestedTokens.map((token, idx) => `
-                    <div class="token-item" onclick='applyToken("${entry.nodeId}", "${token.styleId || ''}", ${entry.isStroke})' title="${token.name}">
-                      <div class="token-swatch" style="background:${token.hex}"></div>
-                      <div style="flex: 1; min-width: 0;">
-                        <div class="token-name">${token.name}</div>
+            ${isLoadingTokens 
+              ? `<div class="tokens-loading">
+                  <div class="spinner"></div>
+                  <div class="spinner-text">Buscando tokens...</div>
+                </div>`
+              : (appliedTokens.length > 0 
+                ? `<div class="tokens-list">
+                    ${appliedTokens.map((token, idx) => `
+                      <div class="token-item" onclick='applyToken("${entry.nodeId}", "${token.styleId || ''}", ${entry.isStroke}, false)' title="${token.name}">
+                        <div class="token-swatch" style="background:${token.hex}"></div>
+                        <div style="flex: 1; min-width: 0;">
+                          <div class="token-name">${token.name}</div>
+                        </div>
                       </div>
-                    </div>
-                  `).join("")}
-                </div>`
-              : `<div class="empty-state-tokens">
-                  Sem tokens de cor para sugerir.
-                </div>`
+                    `).join("")}
+                  </div>`
+                : `<div class="empty-state-tokens">
+                    Sem tokens de cor para sugerir.
+                  </div>`
+              )
             }
           </div>
         </div>
       </div>
 
       <div class="detail-footer">
-        <button class="back-button" onclick="back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg> Voltar para a lista</button>
+        <button class="back-button" onclick="back()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg> 
+          Voltar para a lista
+        </button>
       </div>
     </div>
   `;
@@ -1204,15 +1254,6 @@ function renderTypographyDetail() {
 
   const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
   const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
-
-  let lineHeightStr = "Auto";
-  if (typeof style.lineHeight === "object" && style.lineHeight.unit !== "AUTO") {
-    if (style.lineHeight.unit === "PIXELS") {
-      lineHeightStr = `${style.lineHeight.value}px`;
-    } else if (style.lineHeight.unit === "PERCENT") {
-      lineHeightStr = `${style.lineHeight.value}%`;
-    }
-  }
 
   const displayFontSize =
     typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
@@ -1250,8 +1291,6 @@ function renderTypographyDetail() {
               </div>
             </div>
 
-
-
             <div class="detail-nav">
               <button
                 onclick="prev()"
@@ -1284,7 +1323,6 @@ function renderTypographyDetail() {
               </button>
             </div>
 
-
             ${
               currentGroup.nodeStyles.length > 1
                 ? `<label class="select-all-checkbox">
@@ -1301,20 +1339,24 @@ function renderTypographyDetail() {
           <h4>Estilos sugeridos:</h4>
 
           <div class="tokens-container">
-            ${
-              appliedTokens && appliedTokens.length > 0
+            ${isLoadingTokens 
+              ? `<div class="tokens-loading">
+                  <div class="spinner"></div>
+                  <div class="spinner-text">Buscando estilos...</div>
+                </div>`
+              : (appliedTokens.length > 0
                 ? `<div class="tokens-list">
                     ${appliedTokens.map(token => `
                       <div
                         class="token-item"
-                        onclick='applyToken("${entry.nodeId}", "${token.styleId || ""}", false)'
+                        onclick='applyToken("${entry.nodeId}", "${token.styleId || ""}", false, true)'
                         title="${token.name}"
                       >
                         <div style="flex: 1; min-width: 0;">
                           <div class="token-name">${token.name}</div>
-                          <div class="token-info-small">
-                            ${token.fontStyle} ${token.fontSize}px
-                          </div>
+                          ${token.fontSize ? `<div class="token-info-small">
+                            ${token.fontStyle || ''} ${token.fontSize}px
+                          </div>` : ''}
                         </div>
                       </div>
                     `).join("")}
@@ -1322,10 +1364,10 @@ function renderTypographyDetail() {
                 : `<div class="empty-state-tokens">
                     Sem estilos de fonte para sugerir.
                   </div>`
+              )
             }
           </div>
         </div>
-
 
       </div>
 
@@ -1386,20 +1428,24 @@ function prev() {
 }
 
 
-function applyToken(nodeId, styleId, isStroke) {
+function applyToken(nodeId, styleId, isStroke, isText) {
   if (!styleId) {
     console.error("Nenhum styleId fornecido");
     return;
   }
   
-  console.log(`Aplicando token ao nó ${nodeId}, styleId: ${styleId}, isStroke: ${isStroke}`);
+  console.log(`Aplicando token ao nó ${nodeId}, styleId: ${styleId}, isStroke: ${isStroke}, isText: ${isText}`);
+  
+  // Marca o item como "applying"
+  event.target.closest('.token-item').classList.add('applying');
   
   parent.postMessage({
     pluginMessage: {
       type: "apply-token",
       nodeId,
       styleId,
-      isStroke
+      isStroke,
+      isText
     }
   }, "*");
 }
@@ -1407,6 +1453,8 @@ function applyToken(nodeId, styleId, isStroke) {
 function back() {
   viewMode = "list";
   isSelectAllMode = false;
+  appliedTokens = [];
+  isLoadingTokens = false;
   renderTopBar(true);
   
   if (currentTab === "colors") {
