@@ -562,11 +562,11 @@ h4 + .app-wrapper-2 {
 
 .detail-footer .select-all {
   margin: 0;
-  padding: 6px 12px;
+  /* padding: 6px 12px; */
   font-size: 12px;
-  border: 1px solid #E4E4E7;
-  border-radius: 6px;
-  background: white;
+  /* border: 1px solid #E4E4E7; */
+  /* border-radius: 6px; */
+  /* background: white; */
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -671,6 +671,30 @@ h4 + .app-wrapper-2 {
   width: 16px;
   height: 16px;
 }
+
+.select-all-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #18181B;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  width: 100%;
+}
+
+.select-all-checkbox:hover {
+  background: #F4F4F5;
+  border-color: #BFBFBF;
+}
+
+.select-all-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #4361EE;
+}
 </style>
 </head>
 
@@ -701,6 +725,7 @@ let currentTab = "colors";
 let lastColorGroups = [];
 let lastTypographyGroups = [];
 let appliedTokens = [];
+let isSelectAllMode = false;
 
 let loadingTimeout = null;
 
@@ -838,6 +863,24 @@ function selectCurrentNode() {
   }, "*");
 }
 
+function toggleSelectAll(checked) {
+  isSelectAllMode = checked;
+  
+  if (isSelectAllMode) {
+    // Selecionar todos
+    const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+    parent.postMessage({
+      pluginMessage: {
+        type: "select-multiple-nodes",
+        nodeIds: items.map(n => n.nodeId)
+      }
+    }, "*");
+  } else {
+    // Voltar para seleção individual
+    selectCurrentNode();
+  }
+}
+
 onmessage = e => {
   const msg = e.data.pluginMessage;
   console.log("Mensagem recebida:", msg.type);
@@ -873,7 +916,9 @@ onmessage = e => {
   if (msg.type === "result-suggested-tokens") {
     appliedTokens = msg.tokens || [];
     renderColorDetail();
-    selectCurrentNode();
+    if (!isSelectAllMode) {
+      selectCurrentNode();
+    }
   }
   
   if (msg.type === "result-typography") {
@@ -1012,6 +1057,7 @@ function renderTypographyList(groups) {
 function openDetail(group) {
   currentGroup = group;
   currentIndex = 0;
+  isSelectAllMode = false;
   viewMode = "detail";
   topBarContainer.innerHTML = "";
   
@@ -1025,6 +1071,7 @@ function openDetail(group) {
 function openTypographyDetail(group) {
   currentGroup = group;
   currentIndex = 0;
+  isSelectAllMode = false;
   viewMode = "detail";
   topBarContainer.innerHTML = "";
   renderTypographyDetail();
@@ -1060,7 +1107,10 @@ function renderColorDetail() {
             </div>
               
             ${currentGroup.nodePaints.length > 1
-            ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
+            ? `<label class="select-all-checkbox">
+                <input type="checkbox" ${isSelectAllMode ? "checked" : ""} onchange="toggleSelectAll(this.checked)">
+                <span>Selec. todos</span>
+              </label>`
             : ""}
               
           </div>
@@ -1169,7 +1219,10 @@ function renderTypographyDetail() {
 
             ${
               currentGroup.nodeStyles.length > 1
-                ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
+                ? `<label class="select-all-checkbox">
+                    <input type="checkbox" ${isSelectAllMode ? "checked" : ""} onchange="toggleSelectAll(this.checked)">
+                    <span>Selecionar todos</span>
+                  </label>`
                 : ""
             }
           </div>
@@ -1230,7 +1283,10 @@ function next() {
   } else {
     renderTypographyDetail();
   }
-  selectCurrentNode();
+  
+  if (!isSelectAllMode) {
+    selectCurrentNode();
+  }
 }
 
 function prev() {
@@ -1242,17 +1298,10 @@ function prev() {
   } else {
     renderTypographyDetail();
   }
-  selectCurrentNode();
-}
-
-function selectAll() {
-  const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
-  parent.postMessage({
-    pluginMessage: {
-      type: "select-multiple-nodes",
-      nodeIds: items.map(n => n.nodeId)
-    }
-  }, "*");
+  
+  if (!isSelectAllMode) {
+    selectCurrentNode();
+  }
 }
 
 function applyToken(nodeId, styleId, isStroke) {
@@ -1275,6 +1324,7 @@ function applyToken(nodeId, styleId, isStroke) {
 
 function back() {
   viewMode = "list";
+  isSelectAllMode = false;
   renderTopBar(true);
   
   if (currentTab === "colors") {
