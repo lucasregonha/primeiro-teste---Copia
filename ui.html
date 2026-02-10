@@ -33,6 +33,7 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  background-color: #F4F4F5;
 }
 
 body {
@@ -131,13 +132,16 @@ body {
 }
 
 .text-preview {
-  padding: 16px;
   border: 1px solid #ddd;
   border-radius: 8px;
   background: white;
   text-align: center;
-  width: 100%;
+  width: 64px;
+  height: 64px;
   box-sizing: border-box;
+  text-align: center;
+  bottom: auto;
+  top: auto;
 }
 
 .text-info {
@@ -268,7 +272,7 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px; /* padding em volta de tudo */
+  padding: 4px; /* padding em volta de tudo */
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s;
@@ -353,8 +357,9 @@ let viewMode = "list";
 let currentGroup = null;
 let currentIndex = 0;
 let showHidden = false;
-let lastGroups = [];
 let currentTab = "colors";
+let lastColorGroups = [];
+let lastTypographyGroups = [];
 
 function switchTab(tab) {
   currentTab = tab;
@@ -368,13 +373,12 @@ function switchTab(tab) {
     tabs[1].classList.add("active");
   }
   
-  // Notifica o plugin
-  parent.postMessage({ pluginMessage: { type: "switch-tab", tab } }, "*");
-  
   // Reseta view
   viewMode = "list";
   currentGroup = null;
-  lastGroups = [];
+  
+  // Notifica o plugin
+  parent.postMessage({ pluginMessage: { type: "switch-tab", tab } }, "*");
 }
 
 function renderTopBar(show) {
@@ -464,9 +468,29 @@ function selectCurrentNode() {
 
 onmessage = e => {
   const msg = e.data.pluginMessage;
-  if (msg.type === "empty") renderEmpty();
-  if (msg.type === "result-colors" && currentTab === "colors") renderColorList(msg.groups);
-  if (msg.type === "result-typography" && currentTab === "typography") renderTypographyList(msg.groups);
+  
+  // Se clearAll for true, limpa TUDO e mostra empty
+  if (msg.clearAll) {
+    lastColorGroups = [];
+    lastTypographyGroups = [];
+    renderEmpty();
+    return;
+  }
+  
+  if (msg.type === "empty") {
+    renderEmpty();
+  }
+  
+  if (msg.type === "result-colors") {
+    lastColorGroups = msg.groups;
+    renderColorList(msg.groups);
+  }
+  
+  if (msg.type === "result-typography") {
+    lastTypographyGroups = msg.groups;
+    renderTypographyList(msg.groups);
+  }
+  
   if (msg.type === "init-tab") {
     currentTab = msg.tab;
   }
@@ -481,7 +505,6 @@ function renderEmpty() {
 function renderColorList(groups) {
   viewMode = "list";
   renderTopBar(true);
-  lastGroups = groups;
 
   if (!groups.length) {
     app.innerHTML = `
@@ -534,7 +557,6 @@ function renderColorList(groups) {
 function renderTypographyList(groups) {
   viewMode = "list";
   renderTopBar(true);
-  lastGroups = groups;
 
   if (!groups.length) {
     app.innerHTML = `
@@ -552,7 +574,7 @@ function renderTypographyList(groups) {
   }
 
   app.innerHTML = `
-  <h4>Textos sem token aplicado</h4>
+  <h4>Textos sem estilos aplicados:</h4>
   <div class="app-wrapper-2">
     ${groups.map(g => {
       const style = g.style;
@@ -571,6 +593,7 @@ function renderTypographyList(groups) {
             font-style: ${cssFont.style};
             font-size: 20px;
             color: #18181B;
+            background-color: white;
           ">
             Aa
           </div>
@@ -660,8 +683,8 @@ function renderTypographyDetail() {
 
   app.innerHTML = `
     <div class="detail">
-      <div class="text-preview" style="font-family: '${style.fontFamily}', sans-serif; font-size: ${fontSizeStr}px; font-weight: ${cssFont.weight}; font-style: ${cssFont.style};">
-        The quick brown fox jumps
+      <div class="text-preview" style="font-family: '${style.fontFamily}', sans-serif; font-size: 32px; font-weight: ${cssFont.weight}; font-style: ${cssFont.style};">
+        Ag
       </div>
       
       <div class="text-info">
@@ -726,9 +749,9 @@ function back() {
   renderTopBar(true);
   
   if (currentTab === "colors") {
-    renderColorList(lastGroups);
+    renderColorList(lastColorGroups);
   } else {
-    renderTypographyList(lastGroups);
+    renderTypographyList(lastTypographyGroups);
   }
 }
 </script>

@@ -4,10 +4,9 @@
 figma.showUI(__html__, { width: 360, height: 422 });
 
 // Variáveis de estado
-let analyzedFrames: (FrameNode | ComponentNode | InstanceNode)[] = [];
-let selectingFromUI = false;
 let showHiddenElements = false;
 let currentTab: "colors" | "typography" = "colors";
+let ignoringSelectionChange = false;
 
 /* ---------- HELPERS ---------- */
 
@@ -95,16 +94,6 @@ async function hasValidTextToken(node: TextNode): Promise<boolean> {
 }
 
 /* ---------- CORE - COLORS ---------- */
-
-async function analyzeFrames(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
-    analyzedFrames = frames;
-
-    if (currentTab === "colors") {
-        await analyzeColors(frames);
-    } else {
-        await analyzeTypography(frames);
-    }
-}
 
 async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
     const map = new Map<string, { nodeId: string; paint: Paint; isStroke: boolean; node: SceneNode }[]>();
@@ -240,30 +229,43 @@ interface CustomTextStyle {
 
 /* ---------- EVENTS ---------- */
 
+// Sempre que há mudança de seleção, reanalisa
 figma.on("selectionchange", () => {
-    if (selectingFromUI) return;
+    // Ignora se foi a UI que selecionou
+    if (ignoringSelectionChange) {
+        ignoringSelectionChange = false;
+        return;
+    }
+
     const validNodes = figma.currentPage.selection.filter(
         (n): n is FrameNode | ComponentNode | InstanceNode => 
             n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
     );
-    if (validNodes.length) {
-        analyzeFrames(validNodes);
+
+    if (validNodes.length === 0) {
+        // Sem frames, mostra empty em TODAS as abas
+        figma.ui.postMessage({ type: "empty", clearAll: true });
+        return;
+    }
+
+    // Com frames, analisa a aba atual
+    if (currentTab === "colors") {
+        analyzeColors(validNodes);
     } else {
-        figma.ui.postMessage({ type: "empty" });
+        analyzeTypography(validNodes);
     }
 });
 
 // Mensagens vindas da UI
 figma.ui.onmessage = async (msg) => {
-    selectingFromUI = true;
-
     if (msg.type === "select-node") {
         try {
+            ignoringSelectionChange = true;
             const node = await figma.getNodeByIdAsync(msg.nodeId);
             if (node && isSceneNode(node)) {
                 figma.currentPage.selection = [node];
                 figma.viewport.scrollAndZoomIntoView([node]);
-            } else console.warn("Node inválido:", node);
+            }
         } catch (err) {
             console.error("Erro ao buscar node:", err);
         }
@@ -271,12 +273,13 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "select-multiple-nodes") {
         try {
+            ignoringSelectionChange = true;
             const nodes = await Promise.all(msg.nodeIds.map((id: string) => figma.getNodeByIdAsync(id)));
             const validNodes = nodes.filter((n): n is SceneNode => !!n && isSceneNode(n));
             if (validNodes.length) {
                 figma.currentPage.selection = validNodes;
                 figma.viewport.scrollAndZoomIntoView(validNodes);
-            } else console.warn("Nenhum node válido encontrado:", msg.nodeIds);
+            }
         } catch (err) {
             console.error("Erro ao buscar nodes múltiplos:", err);
         }
@@ -284,18 +287,43 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "toggle-hidden") {
         showHiddenElements = msg.value;
-        if (analyzedFrames.length) analyzeFrames(analyzedFrames);
+        // Reanalisa com o novo estado
+        const validNodes = figma.currentPage.selection.filter(
+            (n): n is FrameNode | ComponentNode | InstanceNode => 
+                n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+        );
+        if (validNodes.length > 0) {
+            if (currentTab === "colors") {
+                analyzeColors(validNodes);
+            } else {
+                analyzeTypography(validNodes);
+            }
+        }
     }
 
     if (msg.type === "switch-tab") {
         currentTab = msg.tab;
-        if (analyzedFrames.length) analyzeFrames(analyzedFrames);
+        // Quando muda de aba, SEMPRE verifica o estado atual do Figma
+        const validNodes = figma.currentPage.selection.filter(
+            (n): n is FrameNode | ComponentNode | InstanceNode => 
+                n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+        );
+        
+        if (validNodes.length === 0) {
+            // Se não tem frames, envia empty
+            figma.ui.postMessage({ type: "empty", clearAll: true });
+        } else {
+            // Se tem frames, analisa a nova aba
+            if (currentTab === "colors") {
+                analyzeColors(validNodes);
+            } else {
+                analyzeTypography(validNodes);
+            }
+        }
     }
-
-    setTimeout(() => (selectingFromUI = false), 50);
 };
 
 /* ---------- INIT ---------- */
-figma.ui.postMessage({ type: "empty" });
+figma.ui.postMessage({ type: "empty", clearAll: true });
 figma.ui.postMessage({ type: "init-tab", tab: currentTab });
 console.log("Plugin iniciado ✅");
