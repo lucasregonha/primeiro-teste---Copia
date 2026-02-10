@@ -179,6 +179,8 @@ button {
 
 .select-all {
   margin-top: 10px;
+  background-color: #F4F4F5;
+  color: #4361EE;
 }
 
 .empty {
@@ -435,27 +437,7 @@ h4 + .app-wrapper-2 {
   gap: 8px;
 }
 
-.detail-nav button {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid #E4E4E7;
-  border-radius: 6px;
-  background: white;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
 
-.detail-nav button:hover:not(:disabled) {
-  background: #F4F4F5;
-  border-color: #BFBFBF;
-}
-
-.detail-nav button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 .nav-counter {
   font-size: 12px;
@@ -496,6 +478,7 @@ h4 + .app-wrapper-2 {
   flex-direction: column;
   gap: 6px;
   flex: 1;
+  overflow-y: auto;
 }
 
 .token-item {
@@ -509,10 +492,16 @@ h4 + .app-wrapper-2 {
   cursor: pointer;
   transition: all 0.2s;
   justify-content: flex-start;
+  user-select: none;
 }
 
 .token-item:hover {
-  background: rgba(24, 24, 27, 0.08);
+  background: rgba(24, 24, 27, 0.12);
+}
+
+.token-item.applying {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .token-swatch {
@@ -527,6 +516,15 @@ h4 + .app-wrapper-2 {
   font-size: 12px;
   color: #18181B;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.token-info-small {
+  font-size: 10px;
+  color: rgba(24, 24, 27, 0.6);
 }
 
 .detail-footer {
@@ -579,6 +577,75 @@ h4 + .app-wrapper-2 {
   gap: 12px;
 }
 
+.empty-state-tokens {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 12px;
+  text-align: center;
+  color: rgba(24, 24, 27, 0.6);
+  font-size: 12px;
+}
+
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+}
+
+.detail-nav button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(24, 24, 27, 0.72);
+}
+
+.detail-nav button:hover:not(:disabled) {
+  background: rgba(112, 112, 123, 0.16);
+}
+
+.detail-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #4361EE;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin: 0;
+}
+
+.back-button:hover {
+  color: #2D41E3;
+  background: rgba(112, 112, 123, 0.16);
+}
+
+.back-button svg {
+  width: 16px;
+  height: 16px;
+}
 </style>
 </head>
 
@@ -608,6 +675,7 @@ let showHidden = false;
 let currentTab = "colors";
 let lastColorGroups = [];
 let lastTypographyGroups = [];
+let appliedTokens = [];
 
 let loadingTimeout = null;
 
@@ -760,6 +828,7 @@ onmessage = e => {
   if (msg.clearAll) {
     lastColorGroups = [];
     lastTypographyGroups = [];
+    appliedTokens = [];
     renderEmpty();
     hideLoading();
     return;
@@ -774,6 +843,12 @@ onmessage = e => {
     lastColorGroups = msg.groups;
     hideLoading();
     renderColorList(msg.groups);
+  }
+
+  if (msg.type === "result-suggested-tokens") {
+    appliedTokens = msg.tokens || [];
+    renderColorDetail();
+    selectCurrentNode();
   }
   
   if (msg.type === "result-typography") {
@@ -911,8 +986,12 @@ function openDetail(group) {
   currentIndex = 0;
   viewMode = "detail";
   topBarContainer.innerHTML = "";
-  renderColorDetail();
-  selectCurrentNode();
+  
+  // Mostra loading enquanto busca tokens
+  app.innerHTML = `<div class="spinner-container show"><div class="spinner"></div><div class="spinner-text">Carregando sugestões</div></div>`;
+  
+  // Solicita tokens ao backend
+  parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
 }
 
 function openTypographyDetail(group) {
@@ -928,14 +1007,10 @@ function renderColorDetail() {
   const entry = currentGroup.nodePaints[currentIndex];
   const bg = paintToCss(entry.paint, entry.node);
   
-  // Tokens sugeridos baseados em tokens comuns de design
-  const suggestedTokens = [
-    { name: "Layout/Brand", color: "#2D41E3" },
-    { name: "Content/Brand", color: "#2D41E3" },
-    { name: "Layout/Primary", color: "#2D41E3" },
-    { name: "Interactive/Primary", color: "#2D41E3" },
-    { name: "Interactive/Primary Hover", color: "#2D41E3" }
-  ];
+  // Tokens aplicados nos frames (dinâmico)
+  const suggestedTokens = appliedTokens && appliedTokens.length > 0 
+    ? appliedTokens 
+    : [];
 
   app.innerHTML = `
     <div class="detail-color-wrapper">
@@ -951,9 +1026,9 @@ function renderColorDetail() {
             </div>
             
             <div class="detail-nav">
-              <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>◀</button>
+              <button onclick="prev()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
               <span class="nav-counter">${currentIndex + 1} de ${currentGroup.nodePaints.length}</span>
-              <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}>▶</button>
+              <button onclick="next()" ${currentGroup.nodePaints.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
               </div>
               
             ${currentGroup.nodePaints.length > 1
@@ -966,20 +1041,28 @@ function renderColorDetail() {
         <div class="detail-right">
           <h4>Tokens sugeridos:</h4>
           <div class="tokens-container">
-            <div class="tokens-list">
-              ${suggestedTokens.map((token, idx) => `
-                <div class="token-item">
-                  <div class="token-swatch" style="background:${token.color}"></div>
-                  <span class="token-name">${token.name}</span>
-                </div>
-              `).join("")}
-            </div>
+            ${suggestedTokens.length > 0 
+              ? `<div class="tokens-list">
+                  ${suggestedTokens.map((token, idx) => `
+                    <div class="token-item" onclick='applyToken("${entry.nodeId}", "${token.styleId || ''}", ${entry.isStroke})' title="${token.name}">
+                      <div class="token-swatch" style="background:${token.hex}"></div>
+                      <div style="flex: 1; min-width: 0;">
+                        <div class="token-name">${token.name}</div>
+                        <div class="token-info-small">${token.hex}</div>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>`
+              : `<div class="empty-state-tokens">
+                  Sem tokens de cor para sugerir.
+                </div>`
+            }
           </div>
         </div>
       </div>
 
       <div class="detail-footer">
-        <h4 class="back" onclick="back()">Voltar para a lista<h4>
+        <button class="back-button" onclick="back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg> Voltar para a lista</button>
       </div>
     </div>
   `;
@@ -1023,15 +1106,15 @@ function renderTypographyDetail() {
       <div>${currentIndex + 1} de ${currentGroup.nodeStyles.length}</div>
 
       <div class="nav">
-        <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>◀</button>
-        <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}>▶</button>
+        <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg></button>
+        <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 ? "disabled" : ""}><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></button>
       </div>
 
       ${currentGroup.nodeStyles.length > 1
         ? `<button class="select-all" onclick="selectAll()">Selecionar todos</button>`
         : ""}
 
-      <div class="back" onclick="back()">Voltar para lista</div>
+      <button class="back-button" onclick="back()"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg> Voltar para a lista</button>
     </div>
   `;
 }
@@ -1066,6 +1149,24 @@ function selectAll() {
     pluginMessage: {
       type: "select-multiple-nodes",
       nodeIds: items.map(n => n.nodeId)
+    }
+  }, "*");
+}
+
+function applyToken(nodeId, styleId, isStroke) {
+  if (!styleId) {
+    console.error("Nenhum styleId fornecido");
+    return;
+  }
+  
+  console.log(`Aplicando token ao nó ${nodeId}, styleId: ${styleId}, isStroke: ${isStroke}`);
+  
+  parent.postMessage({
+    pluginMessage: {
+      type: "apply-token",
+      nodeId,
+      styleId,
+      isStroke
     }
   }, "*");
 }
