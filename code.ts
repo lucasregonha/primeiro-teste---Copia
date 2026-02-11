@@ -262,26 +262,100 @@ async function walkForTextTokens(node: SceneNode, tokenSet: Map<string, { name: 
 }
 
 // Coleta tokens de cor aplicados - busca em TODA a página E estilos locais
-async function collectAppliedColorTokens(frames: (FrameNode | ComponentNode | InstanceNode)[]): Promise<{ name: string; hex: string; styleId?: string }[]> {
-    // 🔥 Busca todos os estilos locais disponíveis primeiro
-    const allLocalTokens = await collectAllLocalColorStyles();
-    
-    const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
-    
-    // Adiciona todos os tokens locais ao set
-    for (const token of allLocalTokens) {
-        const key = `${token.name}_${token.hex}`;
-        tokenSet.set(key, token);
+async function collectAppliedColorTokens(
+  frames: (FrameNode | ComponentNode | InstanceNode)[]
+): Promise<{ name: string; hex: string; styleId?: string }[]> {
+
+  const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
+
+  // 🔥 1️⃣ PRIMEIRO: pega TODOS os estilos locais
+  const localStyles = await figma.getLocalPaintStylesAsync();
+
+  for (const style of localStyles) {
+    if (!style.paints || style.paints.length === 0) continue;
+
+    const firstPaint = style.paints[0];
+    if (firstPaint.type !== "SOLID") continue;
+
+    const hex = rgbToHex(firstPaint.color);
+
+    tokenSet.set(style.id, {
+      name: style.name,
+      hex,
+      styleId: style.id
+    });
+  }
+
+  // 🔥 2️⃣ Depois busca os aplicados no frame (prioridade)
+  async function walk(node: SceneNode) {
+
+    if (!showHiddenElements && !node.visible) return;
+
+    // FILLS
+    if ("fills" in node && Array.isArray(node.fills)) {
+      for (const paint of node.fills) {
+
+        if (!paint || paint.type !== "SOLID") continue;
+
+        if (
+          "fillStyleId" in node &&
+          typeof node.fillStyleId === "string" &&
+          node.fillStyleId !== ""
+        ) {
+          const style = await figma.getStyleByIdAsync(node.fillStyleId);
+
+          if (style) {
+            tokenSet.set(style.id, {
+              name: style.name,
+              hex: rgbToHex(paint.color),
+              styleId: style.id
+            });
+          }
+        }
+      }
     }
 
-    // Busca tokens aplicados nos frames selecionados
-    for (const frame of frames) {
-        await walkForColorTokens(frame, tokenSet);
+    // STROKES
+    if ("strokes" in node && Array.isArray(node.strokes)) {
+      for (const paint of node.strokes) {
+
+        if (!paint || paint.type !== "SOLID") continue;
+
+        if (
+          "strokeStyleId" in node &&
+          typeof node.strokeStyleId === "string" &&
+          node.strokeStyleId !== ""
+        ) {
+          const style = await figma.getStyleByIdAsync(node.strokeStyleId);
+
+          if (style) {
+            tokenSet.set(style.id, {
+              name: style.name,
+              hex: rgbToHex(paint.color),
+              styleId: style.id
+            });
+          }
+        }
+      }
     }
 
-    // Retorna todos os tokens (locais + aplicados), limitado a 10
-    return Array.from(tokenSet.values()).slice(0, 10);
+    if ("children" in node) {
+      for (const child of node.children) {
+        if (isSceneNode(child)) {
+          await walk(child);
+        }
+      }
+    }
+  }
+
+  for (const frame of frames) {
+    await walk(frame);
+  }
+
+  return Array.from(tokenSet.values()).slice(0, 20);
 }
+
+
 
 // Coleta tokens de texto aplicados - com ordenação por similaridade
 async function collectAppliedTextTokens(
@@ -340,7 +414,7 @@ async function collectAppliedTextTokens(
     }
     
     // Limita a 10 tokens
-    return tokens.slice(0, 10);
+    return tokens.slice(0, 6);
 }
 
 /* ---------- ANALYZE FUNCTIONS ---------- */
@@ -643,25 +717,37 @@ figma.ui.onmessage = async (msg) => {
     }
 
     if (msg.type === "apply-token-multiple") {
-        const styleId = msg.styleId;
-        const nodeIds: string[] = msg.nodeIds || [];
+  const styleId = msg.styleId;
+  const nodeIds: string[] = msg.nodeIds || [];
 
-        for (const nodeId of nodeIds) {
-            const node = await figma.getNodeByIdAsync(nodeId);
+  const style = await figma.getStyleByIdAsync(styleId);
 
-            if (node && node.type === "TEXT" && node.characters.length > 0) {
-            await figma.loadFontAsync(node.fontName as FontName);
-            await node.setTextStyleIdAsync(styleId);
-            nodesWithAppliedToken.add(node.id);
-            }
-            if (node && (node.type === "RECTANGLE" || node.type === "ELLIPSE")) {
-            await node.setFillStyleIdAsync(styleId);
-            nodesWithAppliedToken.add(node.id);
-            }
-        }
+  if (!style) {
+    console.log("❌ Style não encontrado");
+    return;
+  }
 
-        parent.postMessage({ pluginMessage: { type: "token-applied-success" } }, "*");
-        }
+  if (style.type !== "PAINT") {
+    console.log("❌ Style não é PAINT, type atual:", style.type);
+    return;
+  }
+
+  for (const nodeId of nodeIds) {
+    const node = await figma.getNodeByIdAsync(nodeId);
+    if (!node) continue;
+
+    if ("fills" in node) {
+      await node.setFillStyleIdAsync(styleId);
+    } else if ("strokes" in node) {
+      await node.setStrokeStyleIdAsync(styleId);
+    } else {
+      console.log("⚠️ Node não tem fills nem strokes:", node.type);
+    }
+  }
+
+  figma.ui.postMessage({ type: "token-applied-success" });
+}
+
 
 
 
@@ -687,19 +773,15 @@ figma.ui.onmessage = async (msg) => {
                         // 🔹 marca node como token aplicado
                         nodesWithAppliedToken.add(node.id);
                     }
-                } else if (isStroke && "strokeStyleId" in node) {
-                    if ("strokes" in node) node.strokes = [];
-                    node.strokeStyleId = styleId;
-
-                    // 🔹 marca node como token aplicado
+                } else if (isStroke && "setStrokeStyleIdAsync" in node) {
+                    await node.setStrokeStyleIdAsync(styleId);
                     nodesWithAppliedToken.add(node.id);
-                } else if (!isStroke && "fillStyleId" in node) {
-                    if ("fills" in node) node.fills = [];
-                    node.fillStyleId = styleId;
 
-                    // 🔹 marca node como token aplicado
+                } else if (!isStroke && "setFillStyleIdAsync" in node) {
+                    await node.setFillStyleIdAsync(styleId);
                     nodesWithAppliedToken.add(node.id);
                 }
+
             }));
 
             // Reanalisa após aplicar
@@ -723,23 +805,30 @@ figma.ui.onmessage = async (msg) => {
         }
     }
 
-    if (msg.type === "apply-typography-token") {
-        const { styleId, nodeIds } = msg;
+    if (msg.type === "apply-typography-token-multiple") {
+        const styleId = msg.styleId;
+        const nodeIds: string[] = msg.nodeIds || [];
 
-        for (const id of nodeIds) {
-            const node = await figma.getNodeByIdAsync(id);
+        const style = await figma.getStyleByIdAsync(styleId);
+
+        if (!style || style.type !== "TEXT") {
+            console.log("❌ Style não é TEXT");
+            return;
+        }
+
+        for (const nodeId of nodeIds) {
+            const node = await figma.getNodeByIdAsync(nodeId);
+
             if (node && node.type === "TEXT") {
-                const textNode = node as TextNode;
-                // Aplica o estilo em TODO o texto do node
-                await textNode.setRangeTextStyleIdAsync(0, textNode.characters.length, styleId);
-
-                // 🔹 marca node como token aplicado
-                nodesWithAppliedToken.add(node.id);
+            await figma.loadFontAsync(node.fontName as FontName);
+            await node.setTextStyleIdAsync(styleId);
             }
         }
 
-        parent.postMessage({ pluginMessage: { type: "token-applied-success" } }, "*");
-    }
+        figma.ui.postMessage({ type: "token-applied-success" });
+        }
+
+
 
 
 

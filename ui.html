@@ -944,18 +944,10 @@ function toggleSelectAll(checked) {
   const nodeIds = items.map(n => n.nodeId);
 
   if (checked) {
+    // Apenas seleciona os nós
     selectNodes(nodeIds);
-
-    if (appliedTokens.length > 0) {
-      const tokenId = appliedTokens[0].id;
-      if (currentTab === "colors") {
-        applyTokenToNodes(tokenId, nodeIds);
-      } else {
-        applyTypographyToken(tokenId, nodeIds);
-      }
-    }
-
   } else {
+    // Volta para navegação individual
     currentIndex = 0;
     selectCurrentNode();
   }
@@ -1506,27 +1498,33 @@ function prev() {
 }
 
 
-function applyToken(nodeId, styleId, isStroke, isText) {
-  if (!styleId) {
-    console.error("Nenhum styleId fornecido");
-    return;
+function applyToken(styleId) {
+  const items =
+    currentTab === "colors"
+      ? currentGroup.nodePaints
+      : currentGroup.nodeStyles;
+
+  let nodeIds;
+
+  if (isSelectAllMode) {
+    // Aplica em todos
+    nodeIds = items.map(n => n.nodeId);
+  } else {
+    // Aplica só no atual
+    nodeIds = [items[currentIndex].nodeId];
   }
-  
-  console.log(`Aplicando token ao nó ${nodeId}, styleId: ${styleId}, isStroke: ${isStroke}, isText: ${isText}`);
-  
-  // Marca o item como "applying"
-  event.target.closest('.token-item').classList.add('applying');
-  
+
   parent.postMessage({
     pluginMessage: {
-      type: "apply-token",
-      nodeId,
+      type: currentTab === "colors"
+        ? "apply-token-multiple"
+        : "apply-typography-token-multiple",
       styleId,
-      isStroke,
-      isText
+      nodeIds
     }
   }, "*");
 }
+
 
 function back() {
   viewMode = "list";
