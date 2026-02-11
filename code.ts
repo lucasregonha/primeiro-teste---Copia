@@ -128,24 +128,28 @@ function calculateTextStyleDistance(
 
 // Coleta todos os estilos locais de cores disponíveis
 async function collectAllLocalColorStyles(): Promise<{ name: string; hex: string; styleId: string }[]> {
-    const tokens: { name: string; hex: string; styleId: string }[] = [];
     const localStyles = await figma.getLocalPaintStylesAsync();
+    const validPrefixTokens: { name: string; hex: string; styleId: string }[] = [];
+    const fallbackTokens: { name: string; hex: string; styleId: string }[] = [];
     
     for (const style of localStyles) {
-        // Verifica se tem prefixo válido
-        if (VALID_TOKEN_PREFIXES.some(prefix => style.name.startsWith(prefix))) {
-            // Verifica se é um estilo SOLID
-            if (style.paints && style.paints.length > 0) {
-                const firstPaint = style.paints[0];
-                if (firstPaint.type === "SOLID") {
-                    const hex = rgbToHex(firstPaint.color);
-                    tokens.push({ name: style.name, hex, styleId: style.id });
+        // Verifica se é um estilo SOLID
+        if (style.paints && style.paints.length > 0) {
+            const firstPaint = style.paints[0];
+            if (firstPaint.type === "SOLID") {
+                const hex = rgbToHex(firstPaint.color);
+                const token = { name: style.name, hex, styleId: style.id };
+
+                if (VALID_TOKEN_PREFIXES.some(prefix => style.name.startsWith(prefix))) {
+                    validPrefixTokens.push(token);
                 }
+
+                fallbackTokens.push(token);
             }
         }
     }
     
-    return tokens;
+    return validPrefixTokens.length > 0 ? validPrefixTokens : fallbackTokens;
 }
 
 // Percorre nó recursivamente coletando tokens de COR
@@ -249,11 +253,6 @@ async function walkForTextTokens(node: SceneNode, tokenSet: Map<string, { name: 
 async function collectAppliedColorTokens(frames: (FrameNode | ComponentNode | InstanceNode)[]): Promise<{ name: string; hex: string; styleId?: string }[]> {
     // 🔥 Busca todos os estilos locais disponíveis primeiro
     const allLocalTokens = await collectAllLocalColorStyles();
-    
-    // Se não houver tokens locais, retorna vazio
-    if (allLocalTokens.length === 0) {
-        return [];
-    }
     
     const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
     
@@ -570,10 +569,17 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "get-suggested-tokens") {
         try {
-            const validNodes = figma.currentPage.selection.filter(
+            let validNodes = figma.currentPage.selection.filter(
                 (n): n is FrameNode | ComponentNode | InstanceNode => 
                     n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
             );
+
+            if (validNodes.length === 0 && rootFrameId) {
+                const rootNode = await figma.getNodeByIdAsync(rootFrameId);
+                if (rootNode && (rootNode.type === "FRAME" || rootNode.type === "COMPONENT" || rootNode.type === "INSTANCE")) {
+                    validNodes = [rootNode];
+                }
+            }
             
             if (validNodes.length > 0) {
                 if (currentTab === "colors") {
