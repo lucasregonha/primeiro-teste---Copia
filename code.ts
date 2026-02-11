@@ -9,7 +9,7 @@ let currentTab: "colors" | "typography" = "colors";
 let ignoringSelectionChange = false;
 let rootFrameId: string | null = null;
 let initialSelectionIds: string[] | null = null;
-
+let nodesWithAppliedToken = new Set<string>();
 
 
 
@@ -45,6 +45,18 @@ const VALID_TOKEN_PREFIXES = [
     "Content Colors/",
     "Brand Colors/"
 ];
+
+// Função para aplicar um token de tipografia em múltiplos TextNodes
+async function applyTypographyToken(nodeIds: string[], styleId: string) {
+  for (const id of nodeIds) {
+    const node = await figma.getNodeByIdAsync(id);
+    if (node && node.type === "TEXT" && node.characters.length > 0) {
+      const textNode = node as TextNode;
+      await textNode.setRangeTextStyleIdAsync(0, textNode.characters.length, styleId);
+    }
+  }
+}
+
 
 // Verifica se um paint tem token válido
 async function hasValidColorToken(node: SceneNode, paint: Paint): Promise<boolean> {
@@ -554,18 +566,35 @@ figma.ui.onmessage = async (msg) => {
     }
 
     if (msg.type === "select-multiple-nodes") {
-        try {
-            ignoringSelectionChange = true;
-            const nodes = await Promise.all(msg.nodeIds.map((id: string) => figma.getNodeByIdAsync(id)));
-            const validNodes = nodes.filter((n): n is SceneNode => !!n && isSceneNode(n));
-            if (validNodes.length) {
-                figma.currentPage.selection = validNodes;
-                figma.viewport.scrollAndZoomIntoView(validNodes);
+    try {
+        ignoringSelectionChange = true;
+
+        const nodes = await Promise.all(
+        msg.nodeIds.map((id: string) => figma.getNodeByIdAsync(id))
+        );
+
+
+        // Mantém apenas SceneNodes válidos
+        const validNodes = nodes.filter((n): n is SceneNode => !!n && isSceneNode(n));
+
+        // Filtra TEXT nodes que têm texto e textStyleId válido
+        const safeNodes = validNodes.filter(n => {
+            if (n.type === "TEXT") {
+                return n.characters.length > 0;  // evita texto vazio
             }
-        } catch (err) {
-            console.error("Erro ao buscar nodes múltiplos:", err);
+            return true;
+        });
+
+        if (safeNodes.length) {
+            figma.currentPage.selection = safeNodes;
+            figma.viewport.scrollAndZoomIntoView(safeNodes);
         }
+    } catch (err) {
+        console.error("Erro ao selecionar nodes:", err);
     }
+}
+
+
 
     if (msg.type === "get-suggested-tokens") {
         try {
@@ -590,7 +619,7 @@ figma.ui.onmessage = async (msg) => {
                     let currentStyle = undefined;
                     if (msg.nodeId) {
                         const node = await figma.getNodeByIdAsync(msg.nodeId);
-                        if (node && node.type === "TEXT") {
+                        if (node && node.type === "TEXT" && node.characters.length > 0) {
                             const fontName = node.fontName !== figma.mixed ? node.fontName : { family: "Inter", style: "Regular" };
                             const fontSize = node.fontSize !== figma.mixed ? node.fontSize : 14;
                             const fontWeight = node.fontWeight !== figma.mixed ? node.fontWeight : 400;
@@ -613,69 +642,109 @@ figma.ui.onmessage = async (msg) => {
         }
     }
 
+    if (msg.type === "apply-token-multiple") {
+        const styleId = msg.styleId;
+        const nodeIds: string[] = msg.nodeIds || [];
+
+        for (const nodeId of nodeIds) {
+            const node = await figma.getNodeByIdAsync(nodeId);
+
+            if (node && node.type === "TEXT" && node.characters.length > 0) {
+            await figma.loadFontAsync(node.fontName as FontName);
+            await node.setTextStyleIdAsync(styleId);
+            nodesWithAppliedToken.add(node.id);
+            }
+            if (node && (node.type === "RECTANGLE" || node.type === "ELLIPSE")) {
+            await node.setFillStyleIdAsync(styleId);
+            nodesWithAppliedToken.add(node.id);
+            }
+        }
+
+        parent.postMessage({ pluginMessage: { type: "token-applied-success" } }, "*");
+        }
+
+
+
     if (msg.type === "apply-token") {
         try {
-            const nodeId = msg.nodeId;
             const styleId = msg.styleId;
             const isStroke = msg.isStroke;
             const isText = msg.isText || false;
 
-            const node = await figma.getNodeByIdAsync(nodeId);
-            if (!node || !isSceneNode(node)) {
-                console.error("Nó não encontrado ou inválido");
-                figma.ui.postMessage({ type: "token-applied-error" });
-                return;
-            }
+            const nodeIds: string[] = msg.nodeIds || [msg.nodeId];
+            const nodes = await Promise.all(nodeIds.map(id => figma.getNodeByIdAsync(id)));
 
-            if (isText && node.type === "TEXT") {
-                const style = await figma.getStyleByIdAsync(styleId);
+            const validNodes = nodes.filter((n): n is SceneNode => !!n && isSceneNode(n));
 
-                if (style && style.type === "TEXT") {
-                    await figma.loadFontAsync(style.fontName);
-                    node.textStyleId = styleId;
-                }
-                }
-                else if (isStroke && "strokeStyleId" in node) {
-                // Limpa strokes antes de aplicar o estilo
-                if ("strokes" in node) {
-                    node.strokes = [];
-                }
-                node.strokeStyleId = styleId;
-                console.log(`✅ Token de stroke aplicado ao nó ${nodeId}`);
-            } else if (!isStroke && "fillStyleId" in node) {
-                // Limpa fills antes de aplicar o estilo
-                if ("fills" in node) {
-                    node.fills = [];
-                }
-                node.fillStyleId = styleId;
-                console.log(`✅ Token de fill aplicado ao nó ${nodeId}`);
-            }
+            await Promise.all(validNodes.map(async (node) => {
+                if (isText && node.type === "TEXT") {
+                    const style = await figma.getStyleByIdAsync(styleId);
+                    if (style && style.type === "TEXT") {
+                        await figma.loadFontAsync(style.fontName as FontName);
+                        // Aplica o token individualmente em cada nó
+                        await node.setTextStyleIdAsync(styleId);
 
-            // ✅ Aguarda um momento para o Figma processar
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            // ✅ Reanalisa após aplicar o token
-            const validNodes = figma.currentPage.selection.filter(
-                (n): n is FrameNode | ComponentNode | InstanceNode => 
+                        // 🔹 marca node como token aplicado
+                        nodesWithAppliedToken.add(node.id);
+                    }
+                } else if (isStroke && "strokeStyleId" in node) {
+                    if ("strokes" in node) node.strokes = [];
+                    node.strokeStyleId = styleId;
+
+                    // 🔹 marca node como token aplicado
+                    nodesWithAppliedToken.add(node.id);
+                } else if (!isStroke && "fillStyleId" in node) {
+                    if ("fills" in node) node.fills = [];
+                    node.fillStyleId = styleId;
+
+                    // 🔹 marca node como token aplicado
+                    nodesWithAppliedToken.add(node.id);
+                }
+            }));
+
+            // Reanalisa após aplicar
+            const frames = figma.currentPage.selection.filter(
+                (n): n is FrameNode | ComponentNode | InstanceNode =>
                     n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
             );
-            
-            if (validNodes.length > 0) {
+
+            if (frames.length > 0) {
                 if (currentTab === "colors") {
-                    await analyzeColors(validNodes);
+                    await analyzeColors(frames);
                 } else {
-                    await analyzeTypography(validNodes);
+                    await analyzeTypography(frames);
                 }
             }
-            
-            // ✅ Notifica a UI que o token foi aplicado
+
             figma.ui.postMessage({ type: "token-applied-success" });
-            
         } catch (err) {
             console.error("Erro ao aplicar token:", err);
             figma.ui.postMessage({ type: "token-applied-error" });
         }
     }
+
+    if (msg.type === "apply-typography-token") {
+        const { styleId, nodeIds } = msg;
+
+        for (const id of nodeIds) {
+            const node = await figma.getNodeByIdAsync(id);
+            if (node && node.type === "TEXT") {
+                const textNode = node as TextNode;
+                // Aplica o estilo em TODO o texto do node
+                await textNode.setRangeTextStyleIdAsync(0, textNode.characters.length, styleId);
+
+                // 🔹 marca node como token aplicado
+                nodesWithAppliedToken.add(node.id);
+            }
+        }
+
+        parent.postMessage({ pluginMessage: { type: "token-applied-success" } }, "*");
+    }
+
+
+
+
+
 
     if (msg.type === "toggle-hidden") {
         showHiddenElements = msg.value;
@@ -721,9 +790,12 @@ figma.ui.onmessage = async (msg) => {
     if (msg.type === "back-to-list") {
         if (!initialSelectionIds || initialSelectionIds.length === 0) return;
 
-        const nodes = initialSelectionIds
-            .map(id => figma.getNodeById(id))
-            .filter((n): n is SceneNode => !!n && isSceneNode(n));
+        const nodes = (
+            await Promise.all(initialSelectionIds.map(id => figma.getNodeByIdAsync(id)))
+        )
+            .filter((n): n is SceneNode => !!n && isSceneNode(n))
+            // 🔹 remove nodes que receberam token
+            .filter(n => !nodesWithAppliedToken.has(n.id));
 
         if (!nodes.length) return;
 
@@ -733,7 +805,8 @@ figma.ui.onmessage = async (msg) => {
 
         // 🔄 libera para próxima navegação
         initialSelectionIds = null;
-        }
+    }
+
 
 
 

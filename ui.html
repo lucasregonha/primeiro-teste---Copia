@@ -759,6 +759,46 @@ let isLoadingTokens = false;
 
 let loadingTimeout = null;
 
+function applyTypographyToken(tokenId, nodeIds) {
+  parent.postMessage(
+    {
+      pluginMessage: {
+        type: "apply-typography-token",
+        styleId: tokenId,
+        nodeIds: nodeIds
+      }
+    },
+    "*"
+  );
+}
+
+
+function selectNodes(nodeIds) {
+  parent.postMessage(
+    {
+      pluginMessage: {
+        type: "select-multiple-nodes",
+        nodeIds: nodeIds
+      }
+    },
+    "*"
+  );
+}
+
+function applyTokenToNodes(tokenId, nodeIds) {
+  parent.postMessage(
+    {
+      pluginMessage: {
+        type: "apply-token-multiple",
+        styleId: tokenId,
+        nodeIds: nodeIds
+      }
+    },
+    "*"
+  );
+}
+
+
 // Funções para controlar o loading
 function showLoading() {
   console.log("Mostrando spinner");
@@ -901,18 +941,20 @@ function toggleSelectAll(checked) {
       ? currentGroup.nodePaints
       : currentGroup.nodeStyles;
 
-  if (checked) {
-    parent.postMessage(
-      {
-        pluginMessage: {
-          type: "select-multiple-nodes",
-          nodeIds: items.map(n => n.nodeId)
-        }
-      },
-      "*"
-    );
+  const nodeIds = items.map(n => n.nodeId);
 
-    currentIndex = items.length - 1;
+  if (checked) {
+    selectNodes(nodeIds);
+
+    if (appliedTokens.length > 0) {
+      const tokenId = appliedTokens[0].id;
+      if (currentTab === "colors") {
+        applyTokenToNodes(tokenId, nodeIds);
+      } else {
+        applyTypographyToken(tokenId, nodeIds);
+      }
+    }
+
   } else {
     currentIndex = 0;
     selectCurrentNode();
@@ -924,6 +966,8 @@ function toggleSelectAll(checked) {
     renderTypographyDetail();
   }
 }
+
+
 
 
 
@@ -1382,6 +1426,7 @@ function renderTypographyDetail() {
                     ${appliedTokens.map(token => `
                       <div
                         class="token-item"
+                        style="display: flex; flex-direction: row;"
                         onclick='applyToken("${entry.nodeId}", "${token.styleId || ""}", false, true)'
                         title="${token.name}"
                       >
