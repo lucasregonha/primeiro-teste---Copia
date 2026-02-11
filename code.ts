@@ -7,6 +7,11 @@ figma.showUI(__html__, { width: 360, height: 422 });
 let showHiddenElements = false;
 let currentTab: "colors" | "typography" = "colors";
 let ignoringSelectionChange = false;
+let rootFrameId: string | null = null;
+let initialSelectionIds: string[] | null = null;
+
+
+
 
 /* ---------- HELPERS ---------- */
 
@@ -330,8 +335,13 @@ async function collectAppliedTextTokens(
 /* ---------- ANALYZE FUNCTIONS ---------- */
 
 // Analisa cores sem tokens
+// Analisa cores sem tokens
 async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
-    const map = new Map<string, { nodeId: string; node: SceneNode; paint: Paint; isStroke: boolean }[]>();
+    // Map: chave = label + tipo (fill/stroke)
+    const map = new Map<
+        string,
+        { nodeId: string; node: SceneNode; paint: Paint; isStroke: boolean; label: string; name: string }[]
+    >();
 
     async function processPaint(node: SceneNode, paint: Paint, isStroke: boolean): Promise<void> {
         if (!paint || paint.visible === false) return;
@@ -340,26 +350,44 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
         const hasToken = await hasValidColorToken(node, paint);
         if (hasToken) return;
 
-        let hex: string;
+        let label: string;
+        let name: string;
+
         if (paint.type === "SOLID") {
-            hex = rgbToHex(paint.color);
+            label = rgbToHex(paint.color); // hexadecimal
         } else if (isGradientPaint(paint)) {
-            const stops = paint.gradientStops;
-            if (stops && stops.length > 0) {
-                hex = rgbToHex(stops[0].color);
-            } else {
-                return;
-            }
+            label = "Gradiente";
         } else {
             return;
         }
 
-        if (!map.has(hex)) map.set(hex, []);
-        map.get(hex)!.push({ nodeId: node.id, node, paint, isStroke });
+        // Recupera styleId apenas se o nó suportar
+        let styleId: string | undefined;
+        if ("fillStyleId" in node && !isStroke) {
+            styleId = node.fillStyleId as string | undefined;
+        } else if ("strokeStyleId" in node && isStroke) {
+            styleId = node.strokeStyleId as string | undefined;
+        }
+
+        if (styleId) {
+            try {
+            const style = await figma.getStyleByIdAsync(styleId);
+            name = style ? style.name : label;
+        } catch (e) {
+            name = label;
+        }
+
+        } else {
+            name = label;
+        }
+
+        const key = `${label}_${isStroke ? "stroke" : "fill"}`;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push({ nodeId: node.id, node, paint, isStroke, label, name });
     }
 
-    let nodeCount = 0;
 
+    // Caminha recursivamente pelos filhos
     async function walk(node: SceneNode): Promise<void> {
         if (!showHiddenElements && !node.visible) return;
 
@@ -382,17 +410,21 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
         }
     }
 
+    // Percorre todos os frames selecionados
     for (const frame of frames) {
         await walk(frame);
     }
 
-    const groups = Array.from(map.entries()).map(([hex, nodePaints]) => ({
-        hex,
+    // Cria array final para enviar à UI
+    const groups = Array.from(map.values()).map(nodePaints => ({
+        label: nodePaints[0].label, // hexadecimal ou "Gradiente"
         nodePaints
     }));
 
     figma.ui.postMessage({ type: "result-colors", groups });
 }
+
+
 
 // Analisa tipografias sem tokens
 async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
@@ -469,6 +501,7 @@ interface CustomTextStyle {
 /* ---------- EVENTS ---------- */
 
 figma.on("selectionchange", () => {
+
     if (ignoringSelectionChange) {
         ignoringSelectionChange = false;
         return;
@@ -478,6 +511,12 @@ figma.on("selectionchange", () => {
         (n): n is FrameNode | ComponentNode | InstanceNode => 
             n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
     );
+
+    if (validNodes.length > 0) {
+        rootFrameId = validNodes[0].id;
+    }
+
+
 
     if (validNodes.length === 0) {
         figma.ui.postMessage({ type: "empty", clearAll: true });
@@ -492,6 +531,16 @@ figma.on("selectionchange", () => {
 });
 
 figma.ui.onmessage = async (msg) => {
+    console.log("📩 mensagem recebida:", msg);
+
+    if (msg.type === "enter-list-view") {
+        // 🔒 salva apenas uma vez
+        if (!initialSelectionIds) {
+            initialSelectionIds = figma.currentPage.selection.map(n => n.id);
+            console.log("📌 seleção inicial salva:", initialSelectionIds);
+        }
+    }
+
     if (msg.type === "select-node") {
         try {
             ignoringSelectionChange = true;
@@ -573,11 +622,14 @@ figma.ui.onmessage = async (msg) => {
             }
 
             if (isText && node.type === "TEXT") {
-                // Aplica estilo de texto
-                await figma.loadFontAsync(node.fontName !== figma.mixed ? node.fontName : { family: "Inter", style: "Regular" });
-                node.textStyleId = styleId;
-                console.log(`✅ Token de texto aplicado ao nó ${nodeId}`);
-            } else if (isStroke && "strokeStyleId" in node) {
+                const style = await figma.getStyleByIdAsync(styleId);
+
+                if (style && style.type === "TEXT") {
+                    await figma.loadFontAsync(style.fontName);
+                    node.textStyleId = styleId;
+                }
+                }
+                else if (isStroke && "strokeStyleId" in node) {
                 // Limpa strokes antes de aplicar o estilo
                 if ("strokes" in node) {
                     node.strokes = [];
@@ -659,6 +711,27 @@ figma.ui.onmessage = async (msg) => {
             }
         }
     }
+
+    if (msg.type === "back-to-list") {
+        if (!initialSelectionIds || initialSelectionIds.length === 0) return;
+
+        const nodes = initialSelectionIds
+            .map(id => figma.getNodeById(id))
+            .filter((n): n is SceneNode => !!n && isSceneNode(n));
+
+        if (!nodes.length) return;
+
+        ignoringSelectionChange = true;
+        figma.currentPage.selection = nodes;
+        figma.viewport.scrollAndZoomIntoView(nodes);
+
+        // 🔄 libera para próxima navegação
+        initialSelectionIds = null;
+        }
+
+
+
+
 };
 
 /* ---------- INIT ---------- */
