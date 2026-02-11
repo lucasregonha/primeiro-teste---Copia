@@ -1068,7 +1068,7 @@ function renderColorList(groups) {
 
             <div class="group-info">
               <div class="group-info-top">
-                <strong class="hex">${g.hex}</strong>
+                <strong class="hex">${g.label}</strong>
                 <span class="type-label">(${typeLabel.toLowerCase()})</span>
               </div>
 
@@ -1196,7 +1196,7 @@ function renderColorDetail() {
             <div class="detail-swatch-large" style="background:${bg}"></div>  
           
             <div class="detail-info">
-              <div id="hex-code">${currentGroup.hex}</div>
+              <div id="hex-code">${currentGroup.label}</div>
               <div class="type-label">(${entry.isStroke ? "stroke" : "fill"})</div>
             </div>
             
