@@ -826,7 +826,6 @@ function renderTopBar(show) {
 
   div.querySelector("input").addEventListener("change", e => {
     showHidden = e.target.checked;
-    showLoading();
     parent.postMessage({ pluginMessage: { type: "toggle-hidden", value: showHidden } }, "*");
   });
 
@@ -936,6 +935,40 @@ onmessage = e => {
   if (msg.type === "analyzing-start") {
     console.log("Iniciando análise...");
     showLoading();
+    return;
+  }
+  
+  // Toggle começou - mostra loading
+  if (msg.type === "toggle-started") {
+    console.log("Toggle iniciado...");
+    showLoading();
+    return;
+  }
+  
+  // Toggle terminou - esconde loading
+  if (msg.type === "toggle-finished") {
+    console.log("Toggle finalizado");
+    hideLoading();
+    return;
+  }
+  
+  // Token aplicado com sucesso
+  if (msg.type === "token-applied-success") {
+    console.log("Token aplicado com sucesso!");
+    // Remove a classe "applying" de todos os itens
+    document.querySelectorAll('.token-item.applying').forEach(el => {
+      el.classList.remove('applying');
+    });
+    return;
+  }
+  
+  // Erro ao aplicar token
+  if (msg.type === "token-applied-error") {
+    console.error("Erro ao aplicar token");
+    // Remove a classe "applying" de todos os itens
+    document.querySelectorAll('.token-item.applying').forEach(el => {
+      el.classList.remove('applying');
+    });
     return;
   }
   
