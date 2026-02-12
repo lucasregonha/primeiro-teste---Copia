@@ -735,25 +735,47 @@ figma.ui.onmessage = async (msg) => {
 
   if (!style) {
     console.log("❌ Style não encontrado");
+    figma.ui.postMessage({ type: "token-applied-error" });
     return;
   }
 
   if (style.type !== "PAINT") {
     console.log("❌ Style não é PAINT, type atual:", style.type);
+    figma.ui.postMessage({ type: "token-applied-error" });
     return;
   }
 
   for (const nodeId of nodeIds) {
     const node = await figma.getNodeByIdAsync(nodeId);
-    if (!node) continue;
+    if (!node || !isSceneNode(node)) continue;
 
-    if ("fills" in node) {
+    // Aplica apenas em fills
+    if ("setFillStyleIdAsync" in node) {
       await node.setFillStyleIdAsync(styleId);
-    } else if ("strokes" in node) {
-      await node.setStrokeStyleIdAsync(styleId);
-    } else {
-      console.log("⚠️ Node não tem fills nem strokes:", node.type);
+      nodesWithAppliedToken.add(node.id);
     }
+  }
+
+  // Reanalisa após aplicar
+  const frames = figma.currentPage.selection.filter(
+      (n): n is FrameNode | ComponentNode | InstanceNode =>
+          n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+  );
+
+  // Se não há frames na seleção, usa o rootFrameId
+  if (frames.length === 0 && rootFrameId) {
+      const rootNode = await figma.getNodeByIdAsync(rootFrameId);
+      if (rootNode && (rootNode.type === "FRAME" || rootNode.type === "COMPONENT" || rootNode.type === "INSTANCE")) {
+          frames.push(rootNode);
+      }
+  }
+
+  if (frames.length > 0) {
+      if (currentTab === "colors") {
+          await analyzeColors(frames);
+      } else {
+          await analyzeTypography(frames);
+      }
   }
 
   figma.ui.postMessage({ type: "token-applied-success" });
@@ -824,6 +846,7 @@ figma.ui.onmessage = async (msg) => {
 
         if (!style || style.type !== "TEXT") {
             console.log("❌ Style não é TEXT");
+            figma.ui.postMessage({ type: "token-applied-error" });
             return;
         }
 
@@ -831,13 +854,36 @@ figma.ui.onmessage = async (msg) => {
             const node = await figma.getNodeByIdAsync(nodeId);
 
             if (node && node.type === "TEXT") {
-            await figma.loadFontAsync(node.fontName as FontName);
-            await node.setTextStyleIdAsync(styleId);
+                await figma.loadFontAsync(node.fontName as FontName);
+                await node.setTextStyleIdAsync(styleId);
+                nodesWithAppliedToken.add(node.id);
+            }
+        }
+
+        // Reanalisa após aplicar
+        const frames = figma.currentPage.selection.filter(
+            (n): n is FrameNode | ComponentNode | InstanceNode =>
+                n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+        );
+
+        // Se não há frames na seleção, usa o rootFrameId
+        if (frames.length === 0 && rootFrameId) {
+            const rootNode = await figma.getNodeByIdAsync(rootFrameId);
+            if (rootNode && (rootNode.type === "FRAME" || rootNode.type === "COMPONENT" || rootNode.type === "INSTANCE")) {
+                frames.push(rootNode);
+            }
+        }
+
+        if (frames.length > 0) {
+            if (currentTab === "colors") {
+                await analyzeColors(frames);
+            } else {
+                await analyzeTypography(frames);
             }
         }
 
         figma.ui.postMessage({ type: "token-applied-success" });
-        }
+    }
 
 
 

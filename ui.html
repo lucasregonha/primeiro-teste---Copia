@@ -1269,7 +1269,7 @@ function renderColorDetail() {
               : (appliedTokens.length > 0 
                 ? `<div class="tokens-list">
                     ${appliedTokens.map((token, idx) => `
-                      <div class="token-item" onclick='applyToken("${entry.nodeId}", "${token.styleId || ''}", ${entry.isStroke}, false)' title="${token.name}">
+                      <div class="token-item" onclick='applyToken("${token.styleId || ''}")' title="${token.name}">
                         <div class="token-swatch" style="background:${token.hex}"></div>
                         <div style="flex: 1; min-width: 0;">
                           <div class="token-name">${token.name}</div>
@@ -1400,7 +1400,7 @@ function renderTypographyDetail() {
                       <div
                         class="token-item"
                         style="display: flex; flex-direction: row;"
-                        onclick='applyToken("${entry.nodeId}", "${token.styleId || ""}", false, true)'
+                        onclick='applyToken("${token.styleId || ""}")'
                         title="${token.name}"
                       >
                         <div style="flex: 1; min-width: 0;">
