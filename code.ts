@@ -619,10 +619,21 @@ figma.ui.onmessage = async (msg) => {
     console.log("📩 mensagem recebida:", msg);
 
     if (msg.type === "enter-list-view") {
-        // 🔒 salva apenas uma vez
+        // 🔒 Salva a seleção inicial se ainda não foi salva
         if (!initialSelectionIds) {
             initialSelectionIds = figma.currentPage.selection.map(n => n.id);
             console.log("📌 seleção inicial salva:", initialSelectionIds);
+        }
+        
+        // 🔥 Garante que temos um rootFrameId salvo
+        const validNodes = figma.currentPage.selection.filter(
+            (n): n is FrameNode | ComponentNode | InstanceNode => 
+                n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+        );
+        
+        if (validNodes.length > 0 && !rootFrameId) {
+            rootFrameId = validNodes[0].id;
+            console.log("📌 rootFrameId salvo:", rootFrameId);
         }
     }
 
@@ -838,13 +849,18 @@ figma.ui.onmessage = async (msg) => {
     if (msg.type === "toggle-hidden") {
         showHiddenElements = msg.value;
         
-        // ✅ Notifica a UI que o toggle começou
-        figma.ui.postMessage({ type: "toggle-started" });
-        
         const validNodes = figma.currentPage.selection.filter(
             (n): n is FrameNode | ComponentNode | InstanceNode => 
                 n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
         );
+        
+        // 🔥 Se não há seleção atual mas temos um rootFrameId salvo, usa ele
+        if (validNodes.length === 0 && rootFrameId) {
+            const rootNode = await figma.getNodeByIdAsync(rootFrameId);
+            if (rootNode && (rootNode.type === "FRAME" || rootNode.type === "COMPONENT" || rootNode.type === "INSTANCE")) {
+                validNodes.push(rootNode);
+            }
+        }
         
         if (validNodes.length > 0) {
             if (currentTab === "colors") {
@@ -853,9 +869,6 @@ figma.ui.onmessage = async (msg) => {
                 await analyzeTypography(validNodes);
             }
         }
-        
-        // ✅ Notifica a UI que o toggle terminou
-        figma.ui.postMessage({ type: "toggle-finished" });
     }
 
     if (msg.type === "switch-tab") {

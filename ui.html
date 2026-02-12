@@ -866,6 +866,8 @@ function renderTopBar(show) {
 
   div.querySelector("input").addEventListener("change", e => {
     showHidden = e.target.checked;
+    // Mostra loading imediatamente
+    showLoading();
     parent.postMessage({ pluginMessage: { type: "toggle-hidden", value: showHidden } }, "*");
   });
 
@@ -966,27 +968,6 @@ function toggleSelectAll(checked) {
 onmessage = e => {
   const msg = e.data.pluginMessage;
   console.log("Mensagem recebida:", msg.type);
-  
-  // Começa análise - mostra spinner
-  if (msg.type === "analyzing-start") {
-    console.log("Iniciando análise...");
-    showLoading();
-    return;
-  }
-  
-  // Toggle começou - mostra loading
-  if (msg.type === "toggle-started") {
-    console.log("Toggle iniciado...");
-    showLoading();
-    return;
-  }
-  
-  // Toggle terminou - esconde loading
-  if (msg.type === "toggle-finished") {
-    console.log("Toggle finalizado");
-    hideLoading();
-    return;
-  }
   
   // Token aplicado com sucesso
   if (msg.type === "token-applied-success") {
@@ -1531,7 +1512,11 @@ function back() {
   isSelectAllMode = false;
   appliedTokens = [];
   isLoadingTokens = false;
+  hideLoading(); // 🔥 FIX: Garante que o spinner seja escondido ao voltar
   renderTopBar(true);
+  
+  // 🔥 Notifica o backend que voltou para list view
+  parent.postMessage({ pluginMessage: { type: "enter-list-view" } }, "*");
   
   if (currentTab === "colors") {
     renderColorList(lastColorGroups);
