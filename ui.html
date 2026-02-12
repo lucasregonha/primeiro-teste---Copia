@@ -1,860 +1,873 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-<meta charset="UTF-8" />
-
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
-
-<style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-& h4 {
-    font-weight: 600;
-    font-size: 14px;
-    margin: 0;
-    display: inline-block;
-    line-height: 14px;
-  }
-
-
-
-html, body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background-color: #F4F4F5;
-}
-
-body {
-  font-family: "Inter";
-  padding: 12px;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.h3 {
-  font-weight: normal;
-  font-size: 14px;
-  margin: 0;
-  display: inline-block;
-  line-height: 14px;
-}
-
-.tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid #E4E4E7;
-  width: fit-content;
-}
-
-.tab {
-  font-size: 14px;
-  color: #18181B;
-  font-weight: 500;
-  padding: 8px 16px;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  font-weight: 500;
-}
-
-.tab.active {
-  color: #4361EE;
-  border-bottom-color: #4361EE;
-}
-
-.top-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.group {
-  display: flex;
-  align-items: center;
-  padding: 8px;
-  border-radius: 8px;
-  margin-bottom: 6px;
-  cursor: pointer;
-}
-
-.group-left {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.group-right {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.swatch {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-}
-
-.type-label {
-  font-size: 9px;
-  color: #555;
-  line-height: 1;
-}
-
-.detail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.detail-swatch {
-  width: 64px;
-  height: 64px;
-  border-radius: 12px;
-  border: 1px solid #ddd;
-}
-
-.text-preview {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: white;
-  text-align: center;
-  width: 64px;
-  height: 64px;
-  box-sizing: border-box;
-  text-align: center;
-  bottom: auto;
-  top: auto;
-}
-
-.text-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
-  color: #555;
-  text-align: center;
-}
-
-#hex-code {
-  font-size: 12px;
-  color: #333;
-}
-
-.nav {
-  display: flex;
-  gap: 8px;
-}
-
-button {
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  cursor: pointer;
-}
-
-.back {
-  margin-top: 20px;
-  font-size: 11px;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.select-all {
-  margin-top: 10px;
-  background-color: #F4F4F5;
-  color: #4361EE;
-}
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 346px;
-  text-align: center;
-  color: #777;
-}
-
-.empty-2 {
-  border: 2px solid #E4E4E7;
-  border-radius: 8px;
-  display: flex;
-  gap: 8px;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 287px;
-  text-align: center;
-  color: #777;
-}
-
-.switch-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: sans-serif;
-  font-size: 14px;
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 32px;
-  height: 16px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(38, 39, 43, 0.08);
-  transition: 0.4s;
-  border-radius: 24px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 12px;
-  width: 12px;
-  left: 2px;
-  bottom: 2.2px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #4361EE; /* cor do switch ligado */
-}
-
-input:checked + .slider:before {
-  transform: translateX(16px);
-}
-
-.app-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  & img {
-    width: 40px;
-    height: 40px;
-  }
-}
-
-.group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px; /* padding em volta de tudo */
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-  position: relative;
-}
-
-.group:hover {
-  background: rgba(112, 112, 123, 0.16);
-}
-
-.group::after {
-  content: "Ver mais";
-  position: absolute;
-  right: 8px;
-  bottom: 10px;
-  transform: translateY(-50%);
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(24, 24, 27, 0.72);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.group:hover::after {
-  opacity: 1;
-}
-
-.swatch-large {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  flex-shrink: 0;
-}
-
-.group-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.group-info-top {
-  display: flex;
-  align-items: center;
-  gap: 8px; /* espaço entre HEX e tipo */
-}
-
-.group-info-bottom {
-  font-size: 12px;
-  color: rgba(24, 24, 27, 0.72);
-}
-
-.app-wrapper-2 {
-  border: 2px solid #E4E4E7; /* borda ao redor da caixa */
-  border-radius: 8px;
-  height: 287px;             /* altura fixa */
-  overflow-y: auto;          /* scroll vertical quando passar do tamanho */
-  padding: 12px;             /* padding interno da caixa */
-  display: flex;
-  flex-direction: column;
-  gap: 8px;                  /* espaço entre os itens */
-
-}
-
-h4 + .app-wrapper-2 {
-  margin-top: 8px;
-}
-
-
-.group-info-top .hex {
-  font-size: 12px;
-  color: #18181B;
-}
-
-.group-info-top .type-label {
-  font-size: 12px;
-  color: rgba(24, 24, 27, 0.72);
-}
-
-/* Loading Spinner */
-.spinner-container {
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  position: fixed;
-  top: 62px;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  background-color: #F4F4F5;
-  z-index: 100;
-  pointer-events: none;
-}
-
-.spinner-container.show {
-  display: flex;
-  pointer-events: auto;
-}
-
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid #e0e0e0;
-  border-top: 3px solid #4361EE;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  box-sizing: border-box;
-}
-
-.spinner-text {
-  font-size: 13px;
-  color: #666;
-  font-family: "Inter", sans-serif;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* NEW STYLES FOR COLOR DETAIL */
-.detail-color-wrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: 12px;
-}
-
-.detail-color-container {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  overflow: hidden;
-}
-
-.detail-left {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  width: 120px;
-}
-
-.detail-swatch-large {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  border: 2px solid #E4E4E7;
-}
-
-.detail-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.detail-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: #18181B;
-  align-self: flex-start;
-}
-
-.detail-info #hex-code {
-  font-size: 14px;
-  font-weight: 600;
-  color: #18181B;
-  width: 120px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
-}
-
-.detail-info .type-label {
-  font-size: 12px;
-  color: rgba(24, 24, 27, 0.6);
-}
-
-.detail-nav {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  justify-content: space-between;
-}
-
-
-
-.nav-counter {
-  font-size: 12px;
-  color: rgba(24, 24, 27, 0.6);
-  width: 60px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.detail-right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow: hidden;
-}
-
-.detail-right h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #18181B;
-  margin: 0;
-  margin-bottom: 4px;
-}
-
-.tokens-container {
-  border: 1px solid #E4E4E7;
-  border-radius: 8px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  overflow: hidden;
-  height: 273px;
-}
-
-.tokens-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.token-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px;
-  border-radius: 6px;
-  background: rgba(38, 39, 43, 0.08);
-  height: 28px;
-  cursor: pointer;
-  transition: all 0.2s;
-  justify-content: flex-start;
-  user-select: none;
-}
-
-.token-item:hover {
-  background: rgba(24, 24, 27, 0.12);
-}
-
-.token-item.applying {
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.token-swatch {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: 1px solid #E4E4E7;
-  flex-shrink: 0;
-}
-
-.token-name {
-  font-size: 12px;
-  color: #18181B;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-}
-
-.token-info-small {
-  font-size: 10px;
-  color: rgba(24, 24, 27, 0.6);
-}
-
-.detail-footer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding-top: 8px;
-  align-items: center;
-}
-
-.detail-footer .select-all {
-  margin: 0;
-  /* padding: 6px 12px; */
-  font-size: 12px;
-  /* border: 1px solid #E4E4E7; */
-  /* border-radius: 6px; */
-  /* background: white; */
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.detail-footer .select-all:hover {
-  background: #F4F4F5;
-  border-color: #BFBFBF;
-}
-
-.detail-footer .back {
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  font-size: 12px;
-  color: #4361EE;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.detail-footer .back:hover {
-  color: #2D41E3;
-  text-decoration: underline;
-}
-
-.container {
-  width: 100%;
-  display: flex;          
-  justify-content: center;  
-  align-items: center;   
-  flex-direction: column;
-  gap: 12px;
-}
-
-.empty-state-tokens {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 12px;
-  text-align: center;
-  color: rgba(24, 24, 27, 0.6);
-  font-size: 12px;
-}
-
-
-.nav-icon {
-  width: 20px;
-  height: 20px;
-  stroke: currentColor;
-  flex-shrink: 0;
-}
-
-.detail-nav button {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(24, 24, 27, 0.72);
-}
-
-.detail-nav button:hover:not(:disabled) {
-  background: rgba(112, 112, 123, 0.16);
-}
-
-.detail-nav button:disabled {
-  opacity: 0.33;
-  cursor: default;
-}
-
-.back-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #4361EE;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin: 0;
-}
-
-.back-button:hover {
-  color: #2D41E3;
-  background: rgba(112, 112, 123, 0.16);
-}
-
-.back-button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.select-all-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #18181B;
-  cursor: pointer;
-  transition: all 0.2s;
-  user-select: none;
-  width: 100%;
-}
-
-.select-all-checkbox:hover {
-  background: #F4F4F5;
-  border-color: #BFBFBF;
-}
-
-.select-all-checkbox input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  accent-color: #4361EE;
-}
-
-/* Loading inline para tokens */
-.tokens-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 12px;
-}
-
-.tokens-loading .spinner {
-  width: 24px;
-  height: 24px;
-  border-width: 2px;
-}
-
-.tokens-loading .spinner-text {
-  font-size: 11px;
-}
-</style>
+  <meta charset="UTF-8" />
+
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+    rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    & h4 {
+      font-weight: 600;
+      font-size: 14px;
+      margin: 0;
+      display: inline-block;
+      line-height: 14px;
+    }
+
+
+
+    html,
+    body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #F4F4F5;
+    }
+
+    body {
+      font-family: "Inter";
+      padding: 12px;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .h3 {
+      font-weight: normal;
+      font-size: 14px;
+      margin: 0;
+      display: inline-block;
+      line-height: 14px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #E4E4E7;
+      width: fit-content;
+    }
+
+    .tab {
+      font-size: 14px;
+      color: #18181B;
+      font-weight: 500;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      font-weight: 500;
+    }
+
+    .tab.active {
+      color: #4361EE;
+      border-bottom-color: #4361EE;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .group {
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+    }
+
+    .group-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .group-right {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+    }
+
+    .type-label {
+      font-size: 9px;
+      color: #555;
+      line-height: 1;
+    }
+
+    .detail {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .detail-swatch {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+    }
+
+    .text-preview {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      text-align: center;
+      width: 64px;
+      height: 64px;
+      box-sizing: border-box;
+      text-align: center;
+      bottom: auto;
+      top: auto;
+    }
+
+    .text-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      color: #555;
+      text-align: center;
+    }
+
+    #hex-code {
+      font-size: 12px;
+      color: #333;
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+    }
+
+    .back {
+      margin-top: 20px;
+      font-size: 11px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .select-all {
+      margin-top: 10px;
+      background-color: #F4F4F5;
+      color: #4361EE;
+    }
+
+    .empty {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 346px;
+      text-align: center;
+      color: #777;
+    }
+
+    .empty-2 {
+      border: 2px solid #E4E4E7;
+      border-radius: 8px;
+      display: flex;
+      gap: 8px;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 287px;
+      text-align: center;
+      color: #777;
+    }
+
+    .switch-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 32px;
+      height: 16px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(38, 39, 43, 0.08);
+      transition: 0.4s;
+      border-radius: 24px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 12px;
+      width: 12px;
+      left: 2px;
+      bottom: 2.2px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+
+    input:checked+.slider {
+      background-color: #4361EE;
+      /* cor do switch ligado */
+    }
+
+    input:checked+.slider:before {
+      transform: translateX(16px);
+    }
+
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      & img {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px;
+      /* padding em volta de tudo */
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+      position: relative;
+    }
+
+    .group:hover {
+      background: rgba(112, 112, 123, 0.16);
+    }
+
+    .group::after {
+      content: "Ver mais";
+      position: absolute;
+      right: 8px;
+      bottom: 10px;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(24, 24, 27, 0.72);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .group:hover::after {
+      opacity: 1;
+    }
+
+    .swatch-large {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      flex-shrink: 0;
+    }
+
+    .group-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .group-info-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      /* espaço entre HEX e tipo */
+    }
+
+    .group-info-bottom {
+      font-size: 12px;
+      color: rgba(24, 24, 27, 0.72);
+    }
+
+    .app-wrapper-2 {
+      border: 2px solid #E4E4E7;
+      /* borda ao redor da caixa */
+      border-radius: 8px;
+      height: 287px;
+      /* altura fixa */
+      overflow-y: auto;
+      /* scroll vertical quando passar do tamanho */
+      padding: 12px;
+      /* padding interno da caixa */
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      /* espaço entre os itens */
+
+    }
+
+    h4+.app-wrapper-2 {
+      margin-top: 8px;
+    }
+
+
+    .group-info-top .hex {
+      font-size: 12px;
+      color: #18181B;
+    }
+
+    .group-info-top .type-label {
+      font-size: 12px;
+      color: rgba(24, 24, 27, 0.72);
+    }
+
+    /* Loading Spinner */
+    .spinner-container {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      position: fixed;
+      top: 62px;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      background-color: #F4F4F5;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .spinner-container.show {
+      display: flex;
+      pointer-events: auto;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #e0e0e0;
+      border-top: 3px solid #4361EE;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      box-sizing: border-box;
+    }
+
+    .spinner-text {
+      font-size: 13px;
+      color: #666;
+      font-family: "Inter", sans-serif;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* NEW STYLES FOR COLOR DETAIL */
+    .detail-color-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      gap: 12px;
+    }
+
+    .detail-color-container {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .detail-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      width: 120px;
+    }
+
+    .detail-swatch-large {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      border: 2px solid #E4E4E7;
+    }
+
+    .detail-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .detail-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #18181B;
+      align-self: flex-start;
+    }
+
+    .detail-info #hex-code {
+      font-size: 14px;
+      font-weight: 600;
+      color: #18181B;
+      width: 120px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+    }
+
+    .detail-info .type-label {
+      font-size: 12px;
+      color: rgba(24, 24, 27, 0.6);
+    }
+
+    .detail-nav {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      justify-content: space-between;
+    }
+
+
+
+    .nav-counter {
+      font-size: 12px;
+      color: rgba(24, 24, 27, 0.6);
+      width: 60px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .detail-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .detail-right h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #18181B;
+      margin: 0;
+      margin-bottom: 4px;
+    }
+
+    .tokens-container {
+      border: 1px solid #E4E4E7;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+      height: 273px;
+    }
+
+    .tokens-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .token-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 4px;
+      border-radius: 6px;
+      background: rgba(38, 39, 43, 0.08);
+      height: 28px;
+      cursor: pointer;
+      transition: all 0.2s;
+      justify-content: flex-start;
+      user-select: none;
+    }
+
+    .token-item:hover {
+      background: rgba(24, 24, 27, 0.12);
+    }
+
+    .token-item.applying {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .token-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid #E4E4E7;
+      flex-shrink: 0;
+    }
+
+    .token-name {
+      font-size: 12px;
+      color: #18181B;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .token-info-small {
+      font-size: 10px;
+      color: rgba(24, 24, 27, 0.6);
+    }
+
+    .detail-footer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-top: 8px;
+      align-items: center;
+    }
+
+    .detail-footer .select-all {
+      margin: 0;
+      /* padding: 6px 12px; */
+      font-size: 12px;
+      /* border: 1px solid #E4E4E7; */
+      /* border-radius: 6px; */
+      /* background: white; */
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .detail-footer .select-all:hover {
+      background: #F4F4F5;
+      border-color: #BFBFBF;
+    }
+
+    .detail-footer .back {
+      width: 100%;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      font-size: 12px;
+      color: #4361EE;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .detail-footer .back:hover {
+      color: #2D41E3;
+      text-decoration: underline;
+    }
+
+    .container {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .empty-state-tokens {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 12px;
+      text-align: center;
+      color: rgba(24, 24, 27, 0.6);
+      font-size: 12px;
+    }
+
+
+    .nav-icon {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      flex-shrink: 0;
+    }
+
+    .detail-nav button {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(24, 24, 27, 0.72);
+    }
+
+    .detail-nav button:hover:not(:disabled) {
+      background: rgba(112, 112, 123, 0.16);
+    }
+
+    .detail-nav button:disabled {
+      opacity: 0.33;
+      cursor: default;
+    }
+
+    .back-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #4361EE;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin: 0;
+    }
+
+    .back-button:hover {
+      color: #2D41E3;
+      background: rgba(112, 112, 123, 0.16);
+    }
+
+    .back-button svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .select-all-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #18181B;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+      width: 100%;
+    }
+
+    .select-all-checkbox:hover {
+      background: #F4F4F5;
+      border-color: #BFBFBF;
+    }
+
+    .select-all-checkbox input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #4361EE;
+    }
+
+    /* Loading inline para tokens */
+    .tokens-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 12px;
+    }
+
+    .tokens-loading .spinner {
+      width: 24px;
+      height: 24px;
+      border-width: 2px;
+    }
+
+    .tokens-loading .spinner-text {
+      font-size: 11px;
+    }
+  </style>
 </head>
 
 <body>
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('colors')">Colors</div>
-  <div class="tab" onclick="switchTab('typography')">Font styles</div>
-</div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('colors')">Colors</div>
+    <div class="tab" onclick="switchTab('typography')">Font styles</div>
+  </div>
 
-<div id="app"></div>
-<div id="top-bar-container"></div>
+  <div id="app"></div>
+  <div id="top-bar-container"></div>
 
-<div class="spinner-container" id="spinner">
-  <div class="spinner"></div>
-  <div class="spinner-text">Carregando</div>
-</div>
+  <div class="spinner-container" id="spinner">
+    <div class="spinner"></div>
+    <div class="spinner-text">Carregando</div>
+  </div>
 
-<script>
-const app = document.getElementById("app");
-const topBarContainer = document.getElementById("top-bar-container");
-const spinner = document.getElementById("spinner");
+  <script>
+    const app = document.getElementById("app");
+    const topBarContainer = document.getElementById("top-bar-container");
+    const spinner = document.getElementById("spinner");
 
-let viewMode = "list";
-let currentGroup = null;
-let currentIndex = 0;
-let showHidden = false;
-let currentTab = "colors";
-let lastColorGroups = [];
-let lastTypographyGroups = [];
-let appliedTokens = [];
-let isSelectAllMode = false;
-let isLoadingTokens = false;
+    let viewMode = "list";
+    let currentGroup = null;
+    let currentIndex = 0;
+    let showHidden = false;
+    let currentTab = "colors";
+    let lastColorGroups = [];
+    let lastTypographyGroups = [];
+    let appliedTokens = [];
+    let isSelectAllMode = false;
+    let isLoadingTokens = false;
 
-let loadingTimeout = null;
+    let loadingTimeout = null;
 
-function applyTypographyToken(tokenId, nodeIds) {
-  parent.postMessage(
-    {
-      pluginMessage: {
-        type: "apply-typography-token",
-        styleId: tokenId,
-        nodeIds: nodeIds
+    function applyTypographyToken(tokenId, nodeIds) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "apply-typography-token",
+            styleId: tokenId,
+            nodeIds: nodeIds
+          }
+        },
+        "*"
+      );
+    }
+
+
+    function selectNodes(nodeIds) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "select-multiple-nodes",
+            nodeIds: nodeIds
+          }
+        },
+        "*"
+      );
+    }
+
+    function applyTokenToNodes(tokenId, nodeIds) {
+      parent.postMessage(
+        {
+          pluginMessage: {
+            type: "apply-token-multiple",
+            styleId: tokenId,
+            nodeIds: nodeIds
+          }
+        },
+        "*"
+      );
+    }
+
+
+    // Funções para controlar o loading
+    function showLoading() {
+      console.log("Mostrando spinner");
+      app.innerHTML = "";
+      topBarContainer.innerHTML = "";
+
+      // Aguarda 300ms antes de realmente mostrar o spinner
+      loadingTimeout = setTimeout(() => {
+        spinner.classList.add("show");
+      }, 300);
+    }
+
+    function hideLoading() {
+      console.log("Escondendo spinner");
+
+      // Limpa o timeout se o carregamento terminar antes de 300ms
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+        loadingTimeout = null;
       }
-    },
-    "*"
-  );
-}
 
+      spinner.classList.remove("show");
+    }
 
-function selectNodes(nodeIds) {
-  parent.postMessage(
-    {
-      pluginMessage: {
-        type: "select-multiple-nodes",
-        nodeIds: nodeIds
+    function switchTab(tab) {
+      currentTab = tab;
+
+      // Atualiza visual das tabs
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      const tabs = document.querySelectorAll(".tab");
+      if (tab === "colors") {
+        tabs[0].classList.add("active");
+      } else {
+        tabs[1].classList.add("active");
       }
-    },
-    "*"
-  );
-}
 
-function applyTokenToNodes(tokenId, nodeIds) {
-  parent.postMessage(
-    {
-      pluginMessage: {
-        type: "apply-token-multiple",
-        styleId: tokenId,
-        nodeIds: nodeIds
-      }
-    },
-    "*"
-  );
-}
+      // Reseta view
+      viewMode = "list";
+      currentGroup = null;
+      appliedTokens = [];
 
+      // Mostra loading
+      showLoading();
 
-// Funções para controlar o loading
-function showLoading() {
-  console.log("Mostrando spinner");
-  app.innerHTML = "";
-  topBarContainer.innerHTML = "";
-  
-  // Aguarda 300ms antes de realmente mostrar o spinner
-  loadingTimeout = setTimeout(() => {
-    spinner.classList.add("show");
-  }, 300);
-}
+      // Notifica o plugin
+      parent.postMessage({ pluginMessage: { type: "switch-tab", tab } }, "*");
+    }
 
-function hideLoading() {
-  console.log("Escondendo spinner");
-  
-  // Limpa o timeout se o carregamento terminar antes de 300ms
-  if (loadingTimeout) {
-    clearTimeout(loadingTimeout);
-    loadingTimeout = null;
-  }
-  
-  spinner.classList.remove("show");
-}
+    function renderTopBar(show) {
+      topBarContainer.innerHTML = "";
+      // Não mostra top bar se não deve mostrar ou não está em modo lista
+      if (!show || viewMode !== "list") return;
 
-function switchTab(tab) {
-  currentTab = tab;
-  
-  // Atualiza visual das tabs
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-  const tabs = document.querySelectorAll(".tab");
-  if (tab === "colors") {
-    tabs[0].classList.add("active");
-  } else {
-    tabs[1].classList.add("active");
-  }
-  
-  // Reseta view
-  viewMode = "list";
-  currentGroup = null;
-  appliedTokens = [];
-  
-  // Mostra loading
-  showLoading();
-  
-  // Notifica o plugin
-  parent.postMessage({ pluginMessage: { type: "switch-tab", tab } }, "*");
-}
-
-function renderTopBar(show) {
-  topBarContainer.innerHTML = "";
-  // Não mostra top bar se não deve mostrar ou não está em modo lista
-  if (!show || viewMode !== "list") return;
-
-  const div = document.createElement("div");
-  div.className = "top-bar";
-  div.innerHTML = `
+      const div = document.createElement("div");
+      div.className = "top-bar";
+      div.innerHTML = `
     <div class="switch-container">
       <label class="switch">
         <input type="checkbox" ${showHidden ? "checked" : ""}/>
@@ -864,197 +877,209 @@ function renderTopBar(show) {
     </div>
   `;
 
-  div.querySelector("input").addEventListener("change", e => {
-    showHidden = e.target.checked;
-    // Mostra loading imediatamente
-    showLoading();
-    parent.postMessage({ pluginMessage: { type: "toggle-hidden", value: showHidden } }, "*");
-  });
+      div.querySelector("input").addEventListener("change", e => {
+        showHidden = e.target.checked;
+        // Mostra loading imediatamente
+        showLoading();
+        parent.postMessage({ pluginMessage: { type: "toggle-hidden", value: showHidden } }, "*");
+      });
 
-  topBarContainer.appendChild(div);
-}
-
-function paintToCss(paint, node) {
-  if (!paint) return "#000";
-
-  if (paint.type === "SOLID") {
-    const r = Math.round(paint.color.r * 255);
-    const g = Math.round(paint.color.g * 255);
-    const b = Math.round(paint.color.b * 255);
-    let a = paint.opacity ?? 1;
-    if (node?.opacity) a *= node.opacity;
-    return `rgba(${r},${g},${b},${a})`;
-  }
-
-  if (paint.type.startsWith("GRADIENT")) {
-    const stops = paint.gradientStops.map(s => {
-      const r = Math.round(s.color.r * 255);
-      const g = Math.round(s.color.g * 255);
-      const b = Math.round(s.color.b * 255);
-      return `rgba(${r},${g},${b},${s.color.a}) ${s.position * 100}%`;
-    }).join(", ");
-    return `linear-gradient(90deg, ${stops})`;
-  }
-
-  return "#000";
-}
-
-// Converte o estilo do Figma (ex: "Bold Italic") para propriedades CSS
-function parseFigmaFontStyle(fontStyle, fontWeight) {
-  let cssWeight = typeof fontWeight === "number" ? fontWeight : 400;
-  let cssStyle = "normal";
-  
-  const styleLower = fontStyle.toLowerCase();
-  
-  // Detecta italic/oblique
-  if (styleLower.includes("italic") || styleLower.includes("oblique")) {
-    cssStyle = "italic";
-  }
-  
-  // Mapeia estilos comuns para pesos
-  if (styleLower.includes("thin")) cssWeight = 100;
-  else if (styleLower.includes("extralight") || styleLower.includes("extra light")) cssWeight = 200;
-  else if (styleLower.includes("light")) cssWeight = 300;
-  else if (styleLower.includes("regular") || styleLower.includes("normal")) cssWeight = 400;
-  else if (styleLower.includes("medium")) cssWeight = 500;
-  else if (styleLower.includes("semibold") || styleLower.includes("semi bold")) cssWeight = 600;
-  else if (styleLower.includes("bold")) cssWeight = 700;
-  else if (styleLower.includes("extrabold") || styleLower.includes("extra bold")) cssWeight = 800;
-  else if (styleLower.includes("black") || styleLower.includes("heavy")) cssWeight = 900;
-  
-  return { weight: cssWeight, style: cssStyle };
-}
-
-function selectCurrentNode() {
-  if (!currentGroup) return;
-  const entry = currentTab === "colors" 
-    ? currentGroup.nodePaints[currentIndex]
-    : currentGroup.nodeStyles[currentIndex];
-  parent.postMessage({
-    pluginMessage: { type: "select-node", nodeId: entry.nodeId }
-  }, "*");
-}
-
-function toggleSelectAll(checked) {
-  isSelectAllMode = checked;
-
-  const items =
-    currentTab === "colors"
-      ? currentGroup.nodePaints
-      : currentGroup.nodeStyles;
-
-  const nodeIds = items.map(n => n.nodeId);
-
-  if (checked) {
-    // Apenas seleciona os nós
-    selectNodes(nodeIds);
-  } else {
-    // Volta para navegação individual
-    currentIndex = 0;
-    selectCurrentNode();
-  }
-
-  if (currentTab === "colors") {
-    renderColorDetail();
-  } else {
-    renderTypographyDetail();
-  }
-}
-
-
-
-
-
-onmessage = e => {
-  const msg = e.data.pluginMessage;
-  console.log("Mensagem recebida:", msg.type);
-  
-  // Token aplicado com sucesso
-  if (msg.type === "token-applied-success") {
-    console.log("Token aplicado com sucesso!");
-    // Remove a classe "applying" de todos os itens
-    document.querySelectorAll('.token-item.applying').forEach(el => {
-      el.classList.remove('applying');
-    });
-    return;
-  }
-  
-  // Erro ao aplicar token
-  if (msg.type === "token-applied-error") {
-    console.error("Erro ao aplicar token");
-    // Remove a classe "applying" de todos os itens
-    document.querySelectorAll('.token-item.applying').forEach(el => {
-      el.classList.remove('applying');
-    });
-    return;
-  }
-  
-  // Se clearAll for true, limpa TUDO e mostra empty
-  if (msg.clearAll) {
-    lastColorGroups = [];
-    lastTypographyGroups = [];
-    appliedTokens = [];
-    renderEmpty();
-    hideLoading();
-    return;
-  }
-  
-  if (msg.type === "empty") {
-    renderEmpty();
-    hideLoading();
-  }
-  
-  if (msg.type === "result-colors") {
-    lastColorGroups = msg.groups;
-    renderColorList(msg.groups);
-    // Garante que o loading seja escondido após a renderização
-    setTimeout(() => hideLoading(), 0);
-  }
-
-  if (msg.type === "result-suggested-tokens") {
-    appliedTokens = msg.tokens || [];
-    isLoadingTokens = false;
-    console.log("Tokens recebidos:", appliedTokens.length);
-    renderColorDetail();
-    if (!isSelectAllMode) {
-      selectCurrentNode();
+      topBarContainer.appendChild(div);
     }
-  }
 
-  if (msg.type === "result-suggested-text-tokens") {
-    appliedTokens = msg.tokens || [];
-    isLoadingTokens = false;
-    console.log("Tokens de texto recebidos:", appliedTokens.length);
-    renderTypographyDetail();
-    if (!isSelectAllMode) {
-      selectCurrentNode();
+    function paintToCss(paint, node) {
+      if (!paint) return "#000";
+
+      if (paint.type === "SOLID") {
+        const r = Math.round(paint.color.r * 255);
+        const g = Math.round(paint.color.g * 255);
+        const b = Math.round(paint.color.b * 255);
+        let a = paint.opacity ?? 1;
+        if (node?.opacity) a *= node.opacity;
+        return `rgba(${r},${g},${b},${a})`;
+      }
+
+      if (paint.type.startsWith("GRADIENT")) {
+        const stops = paint.gradientStops.map(s => {
+          const r = Math.round(s.color.r * 255);
+          const g = Math.round(s.color.g * 255);
+          const b = Math.round(s.color.b * 255);
+          return `rgba(${r},${g},${b},${s.color.a}) ${s.position * 100}%`;
+        }).join(", ");
+        return `linear-gradient(90deg, ${stops})`;
+      }
+
+      return "#000";
     }
-  }
-  
-  if (msg.type === "result-typography") {
-    lastTypographyGroups = msg.groups;
-    renderTypographyList(msg.groups);
-    // Garante que o loading seja escondido após a renderização
-    setTimeout(() => hideLoading(), 0);
-  }
-  
-  if (msg.type === "init-tab") {
-    currentTab = msg.tab;
-  }
-};
 
-function renderEmpty() {
-  viewMode = "list";
-  renderTopBar(false);
-  app.innerHTML = `<div class="empty">Selecione um ou mais frames</div>`;
-}
+    // Converte o estilo do Figma (ex: "Bold Italic") para propriedades CSS
+    function parseFigmaFontStyle(fontStyle, fontWeight) {
+      let cssWeight = typeof fontWeight === "number" ? fontWeight : 400;
+      let cssStyle = "normal";
 
-function renderColorList(groups) {
-  viewMode = "list";
-  renderTopBar(true);
+      const styleLower = fontStyle.toLowerCase();
 
-  if (!groups.length) {
-    app.innerHTML = `
+      // Detecta italic/oblique
+      if (styleLower.includes("italic") || styleLower.includes("oblique")) {
+        cssStyle = "italic";
+      }
+
+      // Mapeia estilos comuns para pesos
+      if (styleLower.includes("thin")) cssWeight = 100;
+      else if (styleLower.includes("extralight") || styleLower.includes("extra light")) cssWeight = 200;
+      else if (styleLower.includes("light")) cssWeight = 300;
+      else if (styleLower.includes("regular") || styleLower.includes("normal")) cssWeight = 400;
+      else if (styleLower.includes("medium")) cssWeight = 500;
+      else if (styleLower.includes("semibold") || styleLower.includes("semi bold")) cssWeight = 600;
+      else if (styleLower.includes("bold")) cssWeight = 700;
+      else if (styleLower.includes("extrabold") || styleLower.includes("extra bold")) cssWeight = 800;
+      else if (styleLower.includes("black") || styleLower.includes("heavy")) cssWeight = 900;
+
+      return { weight: cssWeight, style: cssStyle };
+    }
+
+    function selectCurrentNode() {
+      if (!currentGroup) return;
+      const entry = currentTab === "colors"
+        ? currentGroup.nodePaints[currentIndex]
+        : currentGroup.nodeStyles[currentIndex];
+      parent.postMessage({
+        pluginMessage: { type: "select-node", nodeId: entry.nodeId }
+      }, "*");
+    }
+
+    function toggleSelectAll(checked) {
+      isSelectAllMode = checked;
+
+      const items =
+        currentTab === "colors"
+          ? currentGroup.nodePaints
+          : currentGroup.nodeStyles;
+
+      const nodeIds = items.map(n => n.nodeId);
+
+      if (checked) {
+        // Apenas seleciona os nós
+        selectNodes(nodeIds);
+      } else {
+        // Volta para navegação individual
+        currentIndex = 0;
+        selectCurrentNode();
+      }
+
+      if (currentTab === "colors") {
+        renderColorDetail();
+      } else {
+        renderTypographyDetail();
+      }
+    }
+
+
+
+
+
+    onmessage = e => {
+      const msg = e.data.pluginMessage;
+      console.log("Mensagem recebida:", msg.type);
+
+      // Token aplicado com sucesso
+      if (msg.type === "token-applied-success") {
+        console.log("Token aplicado com sucesso!");
+
+        document.querySelectorAll('.token-item.applying').forEach(el => {
+          el.classList.remove('applying');
+
+          const swatch = el.querySelector('.swatch-large');
+          const hexEl = el.querySelector('.hex');
+
+          if (swatch && hexEl && msg.newColor) {
+            swatch.style.backgroundColor = msg.newColor;
+            swatch.setAttribute('data-token-color', msg.newColor); // atualiza o atributo
+            hexEl.textContent = msg.newColor;
+            hexEl.setAttribute('data-token-color', msg.newColor); // atualiza também no HEX
+          }
+        });
+
+      }
+
+
+
+      // Erro ao aplicar token
+      if (msg.type === "token-applied-error") {
+        console.error("Erro ao aplicar token");
+        // Remove a classe "applying" de todos os itens
+        document.querySelectorAll('.token-item.applying').forEach(el => {
+          el.classList.remove('applying');
+        });
+        return;
+      }
+
+      // Se clearAll for true, limpa TUDO e mostra empty
+      if (msg.clearAll) {
+        lastColorGroups = [];
+        lastTypographyGroups = [];
+        appliedTokens = [];
+        renderEmpty();
+        hideLoading();
+        return;
+      }
+
+      if (msg.type === "empty") {
+        renderEmpty();
+        hideLoading();
+      }
+
+      if (msg.type === "result-colors") {
+        lastColorGroups = msg.groups;
+        renderColorList(msg.groups);
+        // Garante que o loading seja escondido após a renderização
+        setTimeout(() => hideLoading(), 0);
+      }
+
+      if (msg.type === "result-suggested-tokens") {
+        appliedTokens = msg.tokens || [];
+        isLoadingTokens = false;
+        console.log("Tokens recebidos:", appliedTokens.length);
+        renderColorDetail();
+        if (!isSelectAllMode) {
+          selectCurrentNode();
+        }
+      }
+
+      if (msg.type === "result-suggested-text-tokens") {
+        appliedTokens = msg.tokens || [];
+        isLoadingTokens = false;
+        console.log("Tokens de texto recebidos:", appliedTokens.length);
+        renderTypographyDetail();
+        if (!isSelectAllMode) {
+          selectCurrentNode();
+        }
+      }
+
+      if (msg.type === "result-typography") {
+        lastTypographyGroups = msg.groups;
+        renderTypographyList(msg.groups);
+        // Garante que o loading seja escondido após a renderização
+        setTimeout(() => hideLoading(), 0);
+      }
+
+      if (msg.type === "init-tab") {
+        currentTab = msg.tab;
+      }
+    };
+
+    function renderEmpty() {
+      viewMode = "list";
+      renderTopBar(false);
+      app.innerHTML = `<div class="empty">Selecione um ou mais frames</div>`;
+    }
+
+    function renderColorList(groups) {
+      viewMode = "list";
+      renderTopBar(true);
+
+      if (!groups.length) {
+        app.innerHTML = `
     <div class="app-wrapper">
       <h4>Elementos sem token aplicado:</h4>
       <div class="empty-2">
@@ -1065,49 +1090,49 @@ function renderColorList(groups) {
       </div>
     </div>
     `;
-    return;
-  }
+        return;
+      }
 
-  app.innerHTML = `
-    <h4>Elementos sem token aplicado:</h4>
-    <div class="app-wrapper-2">
-      ${groups.map(g => {
+      app.innerHTML = `
+  <h4>Elementos sem token aplicado:</h4>
+  <div class="app-wrapper-2">
+    ${groups.map(g => {
         const np = g.nodePaints[0];
         const swatch = paintToCss(np.paint, np.node);
 
         const typeLabel =
           g.nodePaints.every(n => n.isStroke) ? "Stroke" :
-          g.nodePaints.every(n => !n.isStroke) ? "Fill" : "Mix";
+            g.nodePaints.every(n => !n.isStroke) ? "Fill" : "Mix";
 
         return `
-          <div class="group" onclick='openDetail(${JSON.stringify(g)})'>
-            <div class="swatch-large" style="background:${swatch}"></div>
+        <div class="group" onclick='openDetail(${JSON.stringify(g)})'>
+          <div class="swatch-large" style="background:${swatch}" data-token-color="${swatch}"></div>
 
-            <div class="group-info">
-              <div class="group-info-top">
-                <strong class="hex">${g.label}</strong>
-                <span class="type-label">(${typeLabel.toLowerCase()})</span>
-              </div>
+          <div class="group-info">
+            <div class="group-info-top">
+              <strong class="hex" data-token-color="${swatch}">${g.label}</strong>
+              <span class="type-label">(${typeLabel.toLowerCase()})</span>
+            </div>
 
-              <div class="group-info-bottom">
-                ${g.nodePaints.length} ${g.nodePaints.length === 1 ? "elemento" : "elementos"}
-              </div>
-
+            <div class="group-info-bottom">
+              ${g.nodePaints.length} ${g.nodePaints.length === 1 ? "elemento" : "elementos"}
             </div>
           </div>
-        `;
+        </div>
+      `;
       }).join("")}
-    </div>
-  `;
+  </div>
+`;
 
-}
 
-function renderTypographyList(groups) {
-  viewMode = "list";
-  renderTopBar(true);
+    }
 
-  if (!groups.length) {
-    app.innerHTML = `
+    function renderTypographyList(groups) {
+      viewMode = "list";
+      renderTopBar(true);
+
+      if (!groups.length) {
+        app.innerHTML = `
     <div class="app-wrapper">
       <h4>Textos sem estilos aplicados:</h4>
       <div class="empty-2">
@@ -1118,18 +1143,18 @@ function renderTypographyList(groups) {
       </div>
     </div>
     `;
-    return;
-  }
+        return;
+      }
 
-  app.innerHTML = `
+      app.innerHTML = `
   <h4>Textos sem estilos aplicados:</h4>
   <div class="app-wrapper-2">
     ${groups.map(g => {
-      const style = g.style;
-      const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
-      const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
+        const style = g.style;
+        const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
+        const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
 
-      return `
+        return `
         <div class="group" onclick='openTypographyDetail(${JSON.stringify(g)})'>
           <!-- Quadrado de preview da fonte -->
           <div class="swatch-large" style="
@@ -1159,52 +1184,52 @@ function renderTypographyList(groups) {
           </div>
         </div>
       `;
-    }).join("")}
+      }).join("")}
   </div>
 `;
 
-}
+    }
 
-function openDetail(group) {
-  currentGroup = group;
-  currentIndex = 0;
-  isSelectAllMode = false;
-  isLoadingTokens = true;
-  viewMode = "detail";
-  topBarContainer.innerHTML = "";
-  appliedTokens = [];
-  
-  // Renderiza a tela com loading de tokens
-  renderColorDetail();
-  
-  // Solicita tokens ao backend
-  parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
-}
+    function openDetail(group) {
+      currentGroup = group;
+      currentIndex = 0;
+      isSelectAllMode = false;
+      isLoadingTokens = true;
+      viewMode = "detail";
+      topBarContainer.innerHTML = "";
+      appliedTokens = [];
 
-function openTypographyDetail(group) {
-  currentGroup = group;
-  currentIndex = 0;
-  isSelectAllMode = false;
-  isLoadingTokens = true;
-  viewMode = "detail";
-  topBarContainer.innerHTML = "";
-  appliedTokens = [];
-  
-  // Renderiza a tela com loading de tokens
-  renderTypographyDetail();
-  
-  // Solicita tokens ao backend
-  parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
-  
-  // Seleciona o nó atual
-  selectCurrentNode();
-}
+      // Renderiza a tela com loading de tokens
+      renderColorDetail();
 
-function renderColorDetail() {
-  const entry = currentGroup.nodePaints[currentIndex];
-  const bg = paintToCss(entry.paint, entry.node);
+      // Solicita tokens ao backend
+      parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
+    }
 
-  app.innerHTML = `
+    function openTypographyDetail(group) {
+      currentGroup = group;
+      currentIndex = 0;
+      isSelectAllMode = false;
+      isLoadingTokens = true;
+      viewMode = "detail";
+      topBarContainer.innerHTML = "";
+      appliedTokens = [];
+
+      // Renderiza a tela com loading de tokens
+      renderTypographyDetail();
+
+      // Solicita tokens ao backend
+      parent.postMessage({ pluginMessage: { type: "get-suggested-tokens" } }, "*");
+
+      // Seleciona o nó atual
+      selectCurrentNode();
+    }
+
+    function renderColorDetail() {
+      const entry = currentGroup.nodePaints[currentIndex];
+      const bg = paintToCss(entry.paint, entry.node);
+
+      app.innerHTML = `
     <div class="detail-color-wrapper">
       <div class="detail-color-container">
         <div class="detail-left">
@@ -1230,11 +1255,10 @@ function renderColorDetail() {
               </button>
 
               <span class="nav-counter">
-                ${
-                  isSelectAllMode
-                    ? `${currentGroup.nodePaints.length} de ${currentGroup.nodePaints.length}`
-                    : `${currentIndex + 1} de ${currentGroup.nodePaints.length}`
-                }
+                ${isSelectAllMode
+          ? `${currentGroup.nodePaints.length} de ${currentGroup.nodePaints.length}`
+          : `${currentIndex + 1} de ${currentGroup.nodePaints.length}`
+        }
               </span>
 
               <button
@@ -1250,24 +1274,24 @@ function renderColorDetail() {
             </div>
               
             ${currentGroup.nodePaints.length > 1
-            ? `<label class="select-all-checkbox">
+          ? `<label class="select-all-checkbox">
                 <input type="checkbox" ${isSelectAllMode ? "checked" : ""} onchange="toggleSelectAll(this.checked)">
                 <span>Selec. todos</span>
               </label>`
-            : ""}
+          : ""}
           </div>
         </div>
 
         <div class="detail-right">
           <h4>Tokens sugeridos:</h4>
           <div class="tokens-container">
-            ${isLoadingTokens 
-              ? `<div class="tokens-loading">
+            ${isLoadingTokens
+          ? `<div class="tokens-loading">
                   <div class="spinner"></div>
                   <div class="spinner-text">Buscando tokens...</div>
                 </div>`
-              : (appliedTokens.length > 0 
-                ? `<div class="tokens-list">
+          : (appliedTokens.length > 0
+            ? `<div class="tokens-list">
                     ${appliedTokens.map((token, idx) => `
                       <div class="token-item" onclick='applyToken("${token.styleId || ''}")' title="${token.name}">
                         <div class="token-swatch" style="background:${token.hex}"></div>
@@ -1277,11 +1301,11 @@ function renderColorDetail() {
                       </div>
                     `).join("")}
                   </div>`
-                : `<div class="empty-state-tokens">
+            : `<div class="empty-state-tokens">
                     Sem tokens de cor para sugerir.
                   </div>`
-              )
-            }
+          )
+        }
           </div>
         </div>
       </div>
@@ -1296,19 +1320,19 @@ function renderColorDetail() {
       </div>
     </div>
   `;
-}
+    }
 
-function renderTypographyDetail() {
-  const entry = currentGroup.nodeStyles[currentIndex];
-  const style = entry.style;
+    function renderTypographyDetail() {
+      const entry = currentGroup.nodeStyles[currentIndex];
+      const style = entry.style;
 
-  const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
-  const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
+      const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
+      const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
 
-  const displayFontSize =
-    typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
+      const displayFontSize =
+        typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
 
-  app.innerHTML = `
+      app.innerHTML = `
     <div class="detail-color-wrapper">
       <div class="detail-color-container">
 
@@ -1354,11 +1378,10 @@ function renderTypographyDetail() {
               </button>
 
               <span class="nav-counter">
-                ${
-                  isSelectAllMode
-                    ? `${currentGroup.nodeStyles.length} de ${currentGroup.nodeStyles.length}`
-                    : `${currentIndex + 1} de ${currentGroup.nodeStyles.length}`
-                }
+                ${isSelectAllMode
+          ? `${currentGroup.nodeStyles.length} de ${currentGroup.nodeStyles.length}`
+          : `${currentIndex + 1} de ${currentGroup.nodeStyles.length}`
+        }
               </span>
 
               <button
@@ -1373,14 +1396,13 @@ function renderTypographyDetail() {
               </button>
             </div>
 
-            ${
-              currentGroup.nodeStyles.length > 1
-                ? `<label class="select-all-checkbox">
+            ${currentGroup.nodeStyles.length > 1
+          ? `<label class="select-all-checkbox">
                     <input type="checkbox" ${isSelectAllMode ? "checked" : ""} onchange="toggleSelectAll(this.checked)">
                     <span>Selec. todos</span>
                   </label>`
-                : ""
-            }
+          : ""
+        }
           </div>
         </div>
 
@@ -1389,13 +1411,13 @@ function renderTypographyDetail() {
           <h4>Estilos sugeridos:</h4>
 
           <div class="tokens-container">
-            ${isLoadingTokens 
-              ? `<div class="tokens-loading">
+            ${isLoadingTokens
+          ? `<div class="tokens-loading">
                   <div class="spinner"></div>
                   <div class="spinner-text">Buscando estilos...</div>
                 </div>`
-              : (appliedTokens.length > 0
-                ? `<div class="tokens-list">
+          : (appliedTokens.length > 0
+            ? `<div class="tokens-list">
                     ${appliedTokens.map(token => `
                       <div
                         class="token-item"
@@ -1412,11 +1434,11 @@ function renderTypographyDetail() {
                       </div>
                     `).join("")}
                   </div>`
-                : `<div class="empty-state-tokens">
+            : `<div class="empty-state-tokens">
                     Sem estilos de fonte para sugerir.
                   </div>`
-              )
-            }
+          )
+        }
           </div>
         </div>
 
@@ -1432,98 +1454,99 @@ function renderTypographyDetail() {
       </div>
     </div>
   `;
-}
-
-
-function next() {
-  if (isSelectAllMode) {
-    return;
-  }
-
-  const items =
-    currentTab === "colors"
-      ? currentGroup.nodePaints
-      : currentGroup.nodeStyles;
-
-  currentIndex = (currentIndex + 1) % items.length;
-
-  if (currentTab === "colors") {
-    renderColorDetail();
-  } else {
-    renderTypographyDetail();
-  }
-
-  selectCurrentNode();
-}
-
-
-function prev() {
-  if (isSelectAllMode) {
-    return;
-  }
-
-  const items =
-    currentTab === "colors"
-      ? currentGroup.nodePaints
-      : currentGroup.nodeStyles;
-
-  currentIndex = (currentIndex - 1 + items.length) % items.length;
-
-  if (currentTab === "colors") {
-    renderColorDetail();
-  } else {
-    renderTypographyDetail();
-  }
-
-  selectCurrentNode();
-}
-
-
-function applyToken(styleId) {
-  const items =
-    currentTab === "colors"
-      ? currentGroup.nodePaints
-      : currentGroup.nodeStyles;
-
-  let nodeIds;
-
-  if (isSelectAllMode) {
-    // Aplica em todos
-    nodeIds = items.map(n => n.nodeId);
-  } else {
-    // Aplica só no atual
-    nodeIds = [items[currentIndex].nodeId];
-  }
-
-  parent.postMessage({
-    pluginMessage: {
-      type: currentTab === "colors"
-        ? "apply-token-multiple"
-        : "apply-typography-token-multiple",
-      styleId,
-      nodeIds
     }
-  }, "*");
-}
 
 
-function back() {
-  viewMode = "list";
-  isSelectAllMode = false;
-  appliedTokens = [];
-  isLoadingTokens = false;
-  hideLoading(); // 🔥 FIX: Garante que o spinner seja escondido ao voltar
-  renderTopBar(true);
-  
-  // 🔥 Notifica o backend que voltou para list view
-  parent.postMessage({ pluginMessage: { type: "enter-list-view" } }, "*");
-  
-  if (currentTab === "colors") {
-    renderColorList(lastColorGroups);
-  } else {
-    renderTypographyList(lastTypographyGroups);
-  }
-}
-</script>
+    function next() {
+      if (isSelectAllMode) {
+        return;
+      }
+
+      const items =
+        currentTab === "colors"
+          ? currentGroup.nodePaints
+          : currentGroup.nodeStyles;
+
+      currentIndex = (currentIndex + 1) % items.length;
+
+      if (currentTab === "colors") {
+        renderColorDetail();
+      } else {
+        renderTypographyDetail();
+      }
+
+      selectCurrentNode();
+    }
+
+
+    function prev() {
+      if (isSelectAllMode) {
+        return;
+      }
+
+      const items =
+        currentTab === "colors"
+          ? currentGroup.nodePaints
+          : currentGroup.nodeStyles;
+
+      currentIndex = (currentIndex - 1 + items.length) % items.length;
+
+      if (currentTab === "colors") {
+        renderColorDetail();
+      } else {
+        renderTypographyDetail();
+      }
+
+      selectCurrentNode();
+    }
+
+
+    function applyToken(styleId) {
+      const items =
+        currentTab === "colors"
+          ? currentGroup.nodePaints
+          : currentGroup.nodeStyles;
+
+      let nodeIds;
+
+      if (isSelectAllMode) {
+        // Aplica em todos
+        nodeIds = items.map(n => n.nodeId);
+      } else {
+        // Aplica só no atual
+        nodeIds = [items[currentIndex].nodeId];
+      }
+
+      parent.postMessage({
+        pluginMessage: {
+          type: currentTab === "colors"
+            ? "apply-token-multiple"
+            : "apply-typography-token-multiple",
+          styleId,
+          nodeIds
+        }
+      }, "*");
+    }
+
+
+    function back() {
+      viewMode = "list";
+      isSelectAllMode = false;
+      appliedTokens = [];
+      isLoadingTokens = false;
+      hideLoading(); // 🔥 FIX: Garante que o spinner seja escondido ao voltar
+      renderTopBar(true);
+
+      // 🔥 Notifica o backend que voltou para list view
+      parent.postMessage({ pluginMessage: { type: "enter-list-view" } }, "*");
+
+      if (currentTab === "colors") {
+        renderColorList(lastColorGroups);
+      } else {
+        renderTypographyList(lastTypographyGroups);
+      }
+    }
+  </script>
 </body>
+
 </html>

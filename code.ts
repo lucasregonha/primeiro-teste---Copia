@@ -754,7 +754,16 @@ figma.ui.onmessage = async (msg) => {
             if ("setFillStyleIdAsync" in node) {
                 await node.setFillStyleIdAsync(styleId);
                 nodesWithAppliedToken.add(node.id);
+
+                // Atualiza detalhe na UI
+                figma.ui.postMessage({
+                    type: "update-detail",
+                    nodeId: node.id,
+                    styleName: style.name,
+                    styleId: style.id
+                });
             }
+
         }
 
         figma.ui.postMessage({
@@ -800,6 +809,16 @@ figma.ui.onmessage = async (msg) => {
                     nodesWithAppliedToken.add(node.id);
                 }
 
+                if (style) {
+                    figma.ui.postMessage({
+                        type: "update-detail",
+                        nodeId: node.id,
+                        styleName: style.name,
+                        styleId: style.id
+                    });
+                }
+
+
             }));
 
             if (!style) {
@@ -838,6 +857,13 @@ figma.ui.onmessage = async (msg) => {
                 await figma.loadFontAsync(node.fontName as FontName);
                 await node.setTextStyleIdAsync(styleId);
                 nodesWithAppliedToken.add(node.id);
+
+                figma.ui.postMessage({
+                    type: "update-detail",
+                    nodeId: node.id,
+                    styleName: style.name,
+                    styleId: style.id
+                });
             }
         }
 
