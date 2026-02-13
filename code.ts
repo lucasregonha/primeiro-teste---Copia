@@ -618,6 +618,68 @@ figma.on("selectionchange", () => {
 figma.ui.onmessage = async (msg) => {
     console.log("📩 mensagem recebida:", msg);
 
+    // 🔙 Voltar para lista - processar primeiro!
+    if (msg.type === "back-to-list") {
+        console.log("🔙 Voltando para lista...");
+        
+        // 🔥 Restaura a seleção inicial
+        if (initialSelectionIds && initialSelectionIds.length > 0) {
+            console.log("📌 Restaurando seleção:", initialSelectionIds);
+            
+            const nodes: SceneNode[] = [];
+            
+            for (const id of initialSelectionIds) {
+                const node = await figma.getNodeByIdAsync(id);
+                if (node && isSceneNode(node)) {
+                    nodes.push(node);
+                }
+            }
+
+            if (nodes.length > 0) {
+                // 🔥 IMPORTANTE: Ignora apenas a próxima mudança de seleção
+                ignoringSelectionChange = true;
+                
+                figma.currentPage.selection = nodes;
+                figma.viewport.scrollAndZoomIntoView(nodes);
+                
+                console.log("✅ Seleção restaurada:", nodes.map(n => n.name));
+
+                // 🔄 Aguarda um momento para garantir que a seleção foi aplicada
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                // 🔄 Reanalisa direto (vai remover elementos que agora têm tokens)
+                const validNodes = nodes.filter(
+                    (n): n is FrameNode | ComponentNode | InstanceNode =>
+                        n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+                );
+
+                if (validNodes.length > 0) {
+                    console.log("🔄 Re-analisando frames...");
+                    if (currentTab === "colors") {
+                        await analyzeColors(validNodes);
+                    } else {
+                        await analyzeTypography(validNodes);
+                    }
+                }
+            }
+        }
+
+        // 🔄 Reset de estado
+        initialSelectionIds = null;
+        nodesWithAppliedToken.clear();
+
+        return;
+    }
+
+    // 🔒 Salvar seleção inicial
+    if (msg.type === "save-initial-selection") {
+        if (!initialSelectionIds) {
+            initialSelectionIds = figma.currentPage.selection.map(n => n.id);
+            console.log("📌 Seleção inicial salva (save):", initialSelectionIds);
+        }
+        return;
+    }
+
     if (msg.type === "enter-list-view") {
         // 🔒 Salva a seleção inicial se ainda não foi salva
         if (!initialSelectionIds) {
@@ -924,39 +986,6 @@ figma.ui.onmessage = async (msg) => {
             }
         }
     }
-
-    // 🔙 Voltar para lista
-    if (msg.type === "back-to-list") {
-        ignoringSelectionChange = true;
-
-        if (initialSelectionIds && initialSelectionIds.length > 0) {
-            const nodes = initialSelectionIds
-                .map(id => figma.getNodeById(id))
-                .filter((n): n is SceneNode => n !== null);
-
-            if (nodes.length > 0) {
-                figma.currentPage.selection = nodes;
-                figma.viewport.scrollAndZoomIntoView(nodes);
-
-                // 🔄 Reanalisa direto (sem depender da UI)
-                if (currentTab === "colors") {
-                    await analyzeColors(nodes as any);
-                } else {
-                    await analyzeTypography(nodes as any);
-                }
-            }
-        }
-
-        // 🔄 Reset de estado
-        initialSelectionIds = null;
-        nodesWithAppliedToken.clear();
-
-        ignoringSelectionChange = false;
-
-        return;
-    }
-
-
 
     if (msg.type === "reanalyze") {
 

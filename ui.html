@@ -772,6 +772,9 @@
 
     let loadingTimeout = null;
 
+    // 🔥 Rastreia tokens aplicados por nodeId
+    let appliedTokensByNode = new Map(); // Map<nodeId, { styleName, styleId, hex? }>
+
     function applyTypographyToken(tokenId, nodeIds) {
       parent.postMessage(
         {
@@ -984,22 +987,69 @@
 
       // Token aplicado com sucesso
       if (msg.type === "token-applied-success") {
-        console.log("Token aplicado com sucesso!");
+        console.log("Token aplicado com sucesso!", msg);
 
         document.querySelectorAll('.token-item.applying').forEach(el => {
           el.classList.remove('applying');
-
-          const swatch = el.querySelector('.swatch-large');
-          const hexEl = el.querySelector('.hex');
-
-          if (swatch && hexEl && msg.newColor) {
-            swatch.style.backgroundColor = msg.newColor;
-            swatch.setAttribute('data-token-color', msg.newColor); // atualiza o atributo
-            hexEl.textContent = msg.newColor;
-            hexEl.setAttribute('data-token-color', msg.newColor); // atualiza também no HEX
-          }
         });
 
+        // 🔥 Salva os tokens aplicados por nodeId
+        const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+        
+        if (isSelectAllMode) {
+          // Aplica para todos os nodes
+          items.forEach(item => {
+            const tokenData = {
+              styleName: msg.styleName,
+              styleId: msg.styleId
+            };
+            
+            if (currentTab === "colors") {
+              const token = appliedTokens.find(t => t.styleId === msg.styleId);
+              if (token && token.hex) {
+                tokenData.hex = token.hex;
+              }
+            }
+            
+            appliedTokensByNode.set(item.nodeId, tokenData);
+          });
+        } else {
+          // Aplica apenas para o node atual
+          const currentItem = items[currentIndex];
+          const tokenData = {
+            styleName: msg.styleName,
+            styleId: msg.styleId
+          };
+          
+          if (currentTab === "colors") {
+            const token = appliedTokens.find(t => t.styleId === msg.styleId);
+            if (token && token.hex) {
+              tokenData.hex = token.hex;
+            }
+          }
+          
+          appliedTokensByNode.set(currentItem.nodeId, tokenData);
+        }
+
+        // 🔥 Atualiza os detalhes na tela (hex ou nome da fonte)
+        if (viewMode === "detail") {
+          const hexCodeEl = document.getElementById('hex-code');
+          if (hexCodeEl && msg.styleName) {
+            hexCodeEl.textContent = msg.styleName;
+          }
+
+          // Se for cor, atualiza também o swatch
+          if (currentTab === "colors" && msg.styleId) {
+            const detailSwatch = document.querySelector('.detail-swatch-large');
+            if (detailSwatch) {
+              // Busca a cor do token aplicado
+              const appliedToken = appliedTokens.find(t => t.styleId === msg.styleId);
+              if (appliedToken && appliedToken.hex) {
+                detailSwatch.style.backgroundColor = appliedToken.hex;
+              }
+            }
+          }
+        }
       }
 
 
@@ -1191,6 +1241,9 @@
     }
 
     function openDetail(group) {
+      // 🔥 Salva a seleção inicial quando abre os detalhes
+      parent.postMessage({ pluginMessage: { type: "save-initial-selection" } }, "*");
+      
       currentGroup = group;
       currentIndex = 0;
       isSelectAllMode = false;
@@ -1207,6 +1260,9 @@
     }
 
     function openTypographyDetail(group) {
+      // 🔥 Salva a seleção inicial quando abre os detalhes
+      parent.postMessage({ pluginMessage: { type: "save-initial-selection" } }, "*");
+      
       currentGroup = group;
       currentIndex = 0;
       isSelectAllMode = false;
@@ -1229,16 +1285,21 @@
       const entry = currentGroup.nodePaints[currentIndex];
       const bg = paintToCss(entry.paint, entry.node);
 
+      // 🔥 Verifica se este node já tem um token aplicado
+      const appliedTokenData = appliedTokensByNode.get(entry.nodeId);
+      const displayLabel = appliedTokenData ? appliedTokenData.styleName : currentGroup.label;
+      const displayBg = appliedTokenData && appliedTokenData.hex ? appliedTokenData.hex : bg;
+
       app.innerHTML = `
     <div class="detail-color-wrapper">
       <div class="detail-color-container">
         <div class="detail-left">
           <h4>Cor:</h4>
           <div class="container">
-            <div class="detail-swatch-large" style="background:${bg}"></div>  
+            <div class="detail-swatch-large" style="background:${displayBg}"></div>  
           
             <div class="detail-info">
-              <div id="hex-code">${currentGroup.label}</div>
+              <div id="hex-code">${displayLabel}</div>
               <div class="type-label">(${entry.isStroke ? "stroke" : "fill"})</div>
             </div>
             
@@ -1332,6 +1393,10 @@
       const displayFontSize =
         typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
 
+      // 🔥 Verifica se este node já tem um token aplicado
+      const appliedTokenData = appliedTokensByNode.get(entry.nodeId);
+      const displayLabel = appliedTokenData ? appliedTokenData.styleName : style.fontFamily;
+
       app.innerHTML = `
     <div class="detail-color-wrapper">
       <div class="detail-color-container">
@@ -1359,7 +1424,7 @@
             </div>
 
             <div class="detail-info">
-              <div id="hex-code">${style.fontFamily}</div>
+              <div id="hex-code">${displayLabel}</div>
               <div class="type-label">
                 ${style.fontStyle} ${displayFontSize}
               </div>
@@ -1534,11 +1599,12 @@
       isSelectAllMode = false;
       appliedTokens = [];
       isLoadingTokens = false;
-      hideLoading(); // 🔥 FIX: Garante que o spinner seja escondido ao voltar
+      appliedTokensByNode.clear(); // 🔥 Limpa os tokens aplicados
+      hideLoading();
       renderTopBar(true);
 
       // 🔥 Notifica o backend que voltou para list view
-      parent.postMessage({ pluginMessage: { type: "enter-list-view" } }, "*");
+      parent.postMessage({ pluginMessage: { type: "back-to-list" } }, "*");
 
       if (currentTab === "colors") {
         renderColorList(lastColorGroups);
