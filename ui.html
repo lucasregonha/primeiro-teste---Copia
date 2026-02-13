@@ -573,6 +573,14 @@
       color: rgba(24, 24, 27, 0.6);
     }
 
+    .token-check-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      margin-left: 8px;
+      color: #2D41E3;
+    }
+
     .detail-footer {
       display: flex;
       justify-content: center;
@@ -774,6 +782,9 @@
 
     // 🔥 Rastreia tokens aplicados por nodeId
     let appliedTokensByNode = new Map(); // Map<nodeId, { styleName, styleId, hex? }>
+    
+    // 🔥 Rastreia o último token aplicado (para mostrar o check)
+    let lastAppliedStyleId = null;
 
     function applyTypographyToken(tokenId, nodeIds) {
       parent.postMessage(
@@ -993,6 +1004,9 @@
           el.classList.remove('applying');
         });
 
+        // 🔥 Salva o último token aplicado
+        lastAppliedStyleId = msg.styleId;
+
         // 🔥 Salva os tokens aplicados por nodeId
         const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
         
@@ -1048,6 +1062,13 @@
                 detailSwatch.style.backgroundColor = appliedToken.hex;
               }
             }
+          }
+          
+          // 🔥 Re-renderiza para mostrar o check
+          if (currentTab === "colors") {
+            renderColorDetail();
+          } else {
+            renderTypographyDetail();
           }
         }
       }
@@ -1251,6 +1272,11 @@
       viewMode = "detail";
       topBarContainer.innerHTML = "";
       appliedTokens = [];
+      
+      // 🔥 Verifica se o primeiro elemento tem um token aplicado
+      const firstItem = group.nodePaints[0];
+      const appliedToken = appliedTokensByNode.get(firstItem.nodeId);
+      lastAppliedStyleId = appliedToken ? appliedToken.styleId : null;
 
       // Renderiza a tela com loading de tokens
       renderColorDetail();
@@ -1270,6 +1296,11 @@
       viewMode = "detail";
       topBarContainer.innerHTML = "";
       appliedTokens = [];
+      
+      // 🔥 Verifica se o primeiro elemento tem um token aplicado
+      const firstItem = group.nodeStyles[0];
+      const appliedToken = appliedTokensByNode.get(firstItem.nodeId);
+      lastAppliedStyleId = appliedToken ? appliedToken.styleId : null;
 
       // Renderiza a tela com loading de tokens
       renderTypographyDetail();
@@ -1359,6 +1390,11 @@
                         <div style="flex: 1; min-width: 0;">
                           <div class="token-name">${token.name}</div>
                         </div>
+                        ${lastAppliedStyleId === token.styleId ? `
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="token-check-icon">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        ` : ''}
                       </div>
                     `).join("")}
                   </div>`
@@ -1496,6 +1532,11 @@
                             ${token.fontStyle || ''} ${token.fontSize}px
                           </div>` : ''}
                         </div>
+                        ${lastAppliedStyleId === token.styleId ? `
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="token-check-icon">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        ` : ''}
                       </div>
                     `).join("")}
                   </div>`
@@ -1534,6 +1575,11 @@
 
       currentIndex = (currentIndex + 1) % items.length;
 
+      // 🔥 Verifica se o próximo elemento tem um token aplicado
+      const nextItem = items[currentIndex];
+      const appliedToken = appliedTokensByNode.get(nextItem.nodeId);
+      lastAppliedStyleId = appliedToken ? appliedToken.styleId : null;
+
       if (currentTab === "colors") {
         renderColorDetail();
       } else {
@@ -1555,6 +1601,11 @@
           : currentGroup.nodeStyles;
 
       currentIndex = (currentIndex - 1 + items.length) % items.length;
+
+      // 🔥 Verifica se o elemento anterior tem um token aplicado
+      const prevItem = items[currentIndex];
+      const appliedToken = appliedTokensByNode.get(prevItem.nodeId);
+      lastAppliedStyleId = appliedToken ? appliedToken.styleId : null;
 
       if (currentTab === "colors") {
         renderColorDetail();
