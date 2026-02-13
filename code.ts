@@ -3,6 +3,7 @@
 // Exibe a UI do plugin
 figma.showUI(__html__, { width: 360, height: 422 });
 
+
 // Variáveis de estado
 let showHiddenElements = false;
 let currentTab: "colors" | "typography" = "colors";
