@@ -577,7 +577,6 @@
       width: 16px;
       height: 16px;
       flex-shrink: 0;
-      margin-left: 8px;
       color: #2D41E3;
     }
 
@@ -812,13 +811,15 @@
       );
     }
 
-    function applyTokenToNodes(tokenId, nodeIds) {
+    // 🔥 CORRIGIDO: Agora passa isStroke corretamente
+    function applyTokenToNodes(tokenId, nodeIds, isStroke) {
       parent.postMessage(
         {
           pluginMessage: {
             type: "apply-token-multiple",
             styleId: tokenId,
-            nodeIds: nodeIds
+            nodeIds: nodeIds,
+            isStroke: isStroke
           }
         },
         "*"
@@ -1023,6 +1024,13 @@
               if (token && token.hex) {
                 tokenData.hex = token.hex;
               }
+            } else {
+              // 🔥 Para tipografia, salva também fontStyle e fontSize
+              const token = appliedTokens.find(t => t.styleId === msg.styleId);
+              if (token) {
+                tokenData.fontStyle = token.fontStyle;
+                tokenData.fontSize = token.fontSize;
+              }
             }
             
             appliedTokensByNode.set(item.nodeId, tokenData);
@@ -1039,6 +1047,13 @@
             const token = appliedTokens.find(t => t.styleId === msg.styleId);
             if (token && token.hex) {
               tokenData.hex = token.hex;
+            }
+          } else {
+            // 🔥 Para tipografia, salva também fontStyle e fontSize
+            const token = appliedTokens.find(t => t.styleId === msg.styleId);
+            if (token) {
+              tokenData.fontStyle = token.fontStyle;
+              tokenData.fontSize = token.fontSize;
             }
           }
           
@@ -1064,10 +1079,60 @@
             }
           }
           
-          // 🔥 Re-renderiza para mostrar o check
+          // 🔥 Re-renderiza para mostrar o check e atualizar descrição
           if (currentTab === "colors") {
             renderColorDetail();
           } else {
+            renderTypographyDetail();
+          }
+        }
+      }
+
+      // 🔥 NOVO: Token removido com sucesso
+      if (msg.type === "token-removed-success") {
+        console.log("Token removido com sucesso!", msg);
+
+        // 🔥 Remove o último token aplicado
+        lastAppliedStyleId = null;
+
+        // 🔥 Remove dos tokens aplicados por nodeId
+        const items = currentTab === "colors" ? currentGroup.nodePaints : currentGroup.nodeStyles;
+        
+        if (isSelectAllMode) {
+          items.forEach(item => {
+            appliedTokensByNode.delete(item.nodeId);
+          });
+        } else {
+          const currentItem = items[currentIndex];
+          appliedTokensByNode.delete(currentItem.nodeId);
+        }
+
+        // 🔥 Atualiza os detalhes na tela - volta para valor original
+        if (viewMode === "detail") {
+          const hexCodeEl = document.getElementById('hex-code');
+          
+          if (currentTab === "colors") {
+            const entry = currentGroup.nodePaints[currentIndex];
+            const bg = paintToCss(entry.paint, entry.node);
+            
+            if (hexCodeEl) {
+              hexCodeEl.textContent = currentGroup.label;
+            }
+            
+            const detailSwatch = document.querySelector('.detail-swatch-large');
+            if (detailSwatch) {
+              detailSwatch.style.backgroundColor = bg;
+            }
+            
+            renderColorDetail();
+          } else {
+            const entry = currentGroup.nodeStyles[currentIndex];
+            const style = entry.style;
+            
+            if (hexCodeEl) {
+              hexCodeEl.textContent = style.fontFamily;
+            }
+            
             renderTypographyDetail();
           }
         }
@@ -1077,11 +1142,18 @@
 
       // Erro ao aplicar token
       if (msg.type === "token-applied-error") {
-        console.error("Erro ao aplicar token");
+        console.error("Erro ao aplicar token:", msg.message || "Erro desconhecido");
+        
         // Remove a classe "applying" de todos os itens
         document.querySelectorAll('.token-item.applying').forEach(el => {
           el.classList.remove('applying');
         });
+        
+        // Mostra mensagem de erro ao usuário se houver
+        if (msg.message) {
+          alert(msg.message);
+        }
+        
         return;
       }
 
@@ -1196,6 +1268,8 @@
 `;
 
 
+
+
     }
 
     function renderTypographyList(groups) {
@@ -1245,7 +1319,7 @@
           <!-- Informações da fonte -->
           <div class="group-info">
             <div class="group-info-top">
-              <strong class="hex">${style.fontFamily}</strong>
+              <strong class="hex">${style.fontFamily} ${cssFont.weight}</strong>
             </div>
 
             <div class="group-info-bottom">
@@ -1264,6 +1338,9 @@
     function openDetail(group) {
       // 🔥 Salva a seleção inicial quando abre os detalhes
       parent.postMessage({ pluginMessage: { type: "save-initial-selection" } }, "*");
+      
+      // 🔥 Salva o estado original dos nodes antes de aplicar tokens
+      parent.postMessage({ pluginMessage: { type: "save-original-state", nodeIds: group.nodePaints.map(np => np.nodeId) } }, "*");
       
       currentGroup = group;
       currentIndex = 0;
@@ -1288,6 +1365,9 @@
     function openTypographyDetail(group) {
       // 🔥 Salva a seleção inicial quando abre os detalhes
       parent.postMessage({ pluginMessage: { type: "save-initial-selection" } }, "*");
+      
+      // 🔥 Salva o estado original dos nodes antes de aplicar tokens
+      parent.postMessage({ pluginMessage: { type: "save-original-state", nodeIds: group.nodeStyles.map(ns => ns.nodeId) } }, "*");
       
       currentGroup = group;
       currentIndex = 0;
@@ -1315,6 +1395,7 @@
     function renderColorDetail() {
       const entry = currentGroup.nodePaints[currentIndex];
       const bg = paintToCss(entry.paint, entry.node);
+      const isStroke = entry.isStroke; // 🔥 Salva isStroke em variável
 
       // 🔥 Verifica se este node já tem um token aplicado
       const appliedTokenData = appliedTokensByNode.get(entry.nodeId);
@@ -1384,8 +1465,10 @@
                 </div>`
           : (appliedTokens.length > 0
             ? `<div class="tokens-list">
-                    ${appliedTokens.map((token, idx) => `
-                      <div class="token-item" onclick='applyToken("${token.styleId || ''}")' title="${token.name}">
+                    ${appliedTokens.map((token, idx) => {
+                      const safeName = (token.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                      return `
+                      <div class="token-item" onclick="applyToken('${token.styleId || ''}', ${isStroke})" title="${safeName}">
                         <div class="token-swatch" style="background:${token.hex}"></div>
                         <div style="flex: 1; min-width: 0;">
                           <div class="token-name">${token.name}</div>
@@ -1396,7 +1479,7 @@
                           </svg>
                         ` : ''}
                       </div>
-                    `).join("")}
+                    `}).join("")}
                   </div>`
             : `<div class="empty-state-tokens">
                     Sem tokens de cor para sugerir.
@@ -1423,15 +1506,18 @@
       const entry = currentGroup.nodeStyles[currentIndex];
       const style = entry.style;
 
-      const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
-      const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
-
-      const displayFontSize =
-        typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize;
-
       // 🔥 Verifica se este node já tem um token aplicado
       const appliedTokenData = appliedTokensByNode.get(entry.nodeId);
+      
+      // 🔥 Usa dados do token aplicado se existir, senão usa do estilo original
       const displayLabel = appliedTokenData ? appliedTokenData.styleName : style.fontFamily;
+      const displayFontStyle = appliedTokenData && appliedTokenData.fontStyle ? appliedTokenData.fontStyle : style.fontStyle;
+      const displayFontSize = appliedTokenData && appliedTokenData.fontSize 
+        ? `${appliedTokenData.fontSize}px` 
+        : (typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize);
+
+      const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
+      const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
 
       app.innerHTML = `
     <div class="detail-color-wrapper">
@@ -1462,7 +1548,7 @@
             <div class="detail-info">
               <div id="hex-code">${displayLabel}</div>
               <div class="type-label">
-                ${style.fontStyle} ${displayFontSize}
+                ${displayFontStyle} ${displayFontSize}
               </div>
             </div>
 
@@ -1519,12 +1605,14 @@
                 </div>`
           : (appliedTokens.length > 0
             ? `<div class="tokens-list">
-                    ${appliedTokens.map(token => `
+                    ${appliedTokens.map(token => {
+                      const safeName = (token.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                      return `
                       <div
                         class="token-item"
                         style="display: flex; flex-direction: row;"
-                        onclick='applyToken("${token.styleId || ""}")'
-                        title="${token.name}"
+                        onclick="applyToken('${token.styleId || ''}', false)"
+                        title="${safeName}"
                       >
                         <div style="flex: 1; min-width: 0;">
                           <div class="token-name">${token.name}</div>
@@ -1538,7 +1626,7 @@
                           </svg>
                         ` : ''}
                       </div>
-                    `).join("")}
+                    `}).join("")}
                   </div>`
             : `<div class="empty-state-tokens">
                     Sem estilos de fonte para sugerir.
@@ -1617,7 +1705,10 @@
     }
 
 
-    function applyToken(styleId) {
+    // 🔥 CORRIGIDO: Agora aceita isStroke como parâmetro
+    function applyToken(styleId, isStroke = false) {
+      console.log("🔵 applyToken chamado:", { styleId, isStroke, currentTab });
+      
       const items =
         currentTab === "colors"
           ? currentGroup.nodePaints
@@ -1633,12 +1724,53 @@
         nodeIds = [items[currentIndex].nodeId];
       }
 
+      console.log("🔵 nodeIds:", nodeIds);
+
+      // 🔥 NOVO: Verifica se está clicando no token já aplicado para desaplicar
+      if (lastAppliedStyleId === styleId) {
+        console.log("🔵 Desaplicando token...");
+        // Remove o token aplicado
+        if (currentTab === "colors") {
+          removeColorToken(nodeIds, isStroke);
+        } else {
+          removeTextToken(nodeIds);
+        }
+        return;
+      }
+
+      if (currentTab === "colors") {
+        // Para cores, usa apply-token-multiple com isStroke
+        console.log("🔵 Aplicando cor...");
+        applyTokenToNodes(styleId, nodeIds, isStroke);
+      } else {
+        // Para tipografia, usa apply-typography-token-multiple
+        console.log("🔵 Aplicando tipografia...", { type: "apply-typography-token-multiple", styleId, nodeIds });
+        parent.postMessage({
+          pluginMessage: {
+            type: "apply-typography-token-multiple",
+            styleId,
+            nodeIds
+          }
+        }, "*");
+      }
+    }
+
+    // 🔥 NOVA FUNÇÃO: Remove token de cor
+    function removeColorToken(nodeIds, isStroke) {
       parent.postMessage({
         pluginMessage: {
-          type: currentTab === "colors"
-            ? "apply-token-multiple"
-            : "apply-typography-token-multiple",
-          styleId,
+          type: "remove-color-token",
+          nodeIds,
+          isStroke
+        }
+      }, "*");
+    }
+
+    // 🔥 NOVA FUNÇÃO: Remove token de texto
+    function removeTextToken(nodeIds) {
+      parent.postMessage({
+        pluginMessage: {
+          type: "remove-text-token",
           nodeIds
         }
       }, "*");
