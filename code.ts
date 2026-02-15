@@ -308,16 +308,23 @@ async function walkForTextTokens(node: SceneNode, tokenSet: Map<string, { name: 
     }
 }
 
-// Coleta tokens de cor aplicados - busca em TODA a página E estilos locais
+// Coleta tokens de cor aplicados - busca em bibliotecas E estilos locais
 async function collectAppliedColorTokens(
     frames: (FrameNode | ComponentNode | InstanceNode)[]
 ): Promise<{ name: string; hex: string; styleId?: string }[]> {
 
     const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
 
-    // 🔥 1️⃣ PRIMEIRO: pega TODOS os estilos locais
+    // 🔥 1️⃣ BUSCA em bibliotecas E locais
+    console.log("🔍 Buscando estilos de cor disponíveis...");
+    
+    // Pega estilos locais
     const localStyles = await figma.getLocalPaintStylesAsync();
+    console.log("   📦 Estilos locais encontrados:", localStyles.length);
 
+    // 🔥 NOVO: Tenta pegar estilos de bibliotecas através dos componentes publicados
+    let libraryStyleCount = 0;
+    
     for (const style of localStyles) {
         if (!style.paints || style.paints.length === 0) continue;
 
@@ -326,14 +333,23 @@ async function collectAppliedColorTokens(
 
         const hex = rgbToHex(firstPaint.color);
 
+        // 🔥 Identifica se é de biblioteca
+        const isRemote = style.remote || false;
+        const prefix = isRemote ? "📚 " : "";
+        
+        if (isRemote) libraryStyleCount++;
+
         tokenSet.set(style.id, {
-            name: removeTokenPrefix(style.name),
+            name: removeTokenPrefix(prefix + style.name),
             hex,
             styleId: style.id
         });
     }
+    
+    console.log("   📚 Estilos de biblioteca encontrados:", libraryStyleCount);
+    console.log("   ✅ Total de estilos disponíveis:", tokenSet.size);
 
-    // 🔥 2️⃣ Depois busca os aplicados no frame (prioridade)
+    // 🔥 2️⃣ Busca os aplicados no frame (adiciona à lista se não existir)
     async function walk(node: SceneNode) {
 
         if (!showHiddenElements && !node.visible) return;
@@ -352,8 +368,11 @@ async function collectAppliedColorTokens(
                     const style = await figma.getStyleByIdAsync(node.fillStyleId);
 
                     if (style) {
+                        const isRemote = style.remote || false;
+                        const prefix = isRemote ? "📚 " : "";
+                        
                         tokenSet.set(style.id, {
-                            name: removeTokenPrefix(style.name),
+                            name: removeTokenPrefix(prefix + style.name),
                             hex: rgbToHex(paint.color),
                             styleId: style.id
                         });
@@ -376,8 +395,11 @@ async function collectAppliedColorTokens(
                     const style = await figma.getStyleByIdAsync(node.strokeStyleId);
 
                     if (style) {
+                        const isRemote = style.remote || false;
+                        const prefix = isRemote ? "📚 " : "";
+                        
                         tokenSet.set(style.id, {
-                            name: removeTokenPrefix(style.name),
+                            name: removeTokenPrefix(prefix + style.name),
                             hex: rgbToHex(paint.color),
                             styleId: style.id
                         });
@@ -404,15 +426,19 @@ async function collectAppliedColorTokens(
 
 
 
-// Coleta tokens de texto aplicados - com ordenação por similaridade
+// Coleta tokens de texto aplicados - com ordenação por similaridade - busca em bibliotecas
 async function collectAppliedTextTokens(
     frames: (FrameNode | ComponentNode | InstanceNode)[],
     currentStyle?: { fontFamily: string; fontSize?: number; fontWeight?: any }
 ): Promise<{ name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[]> {
     const tokenSet = new Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>();
 
-    // 🔥 Busca TODOS os estilos de texto locais disponíveis primeiro
+    // 🔥 Busca TODOS os estilos de texto disponíveis (locais + bibliotecas)
+    console.log("🔍 Buscando estilos de texto disponíveis...");
     const localTextStyles = await figma.getLocalTextStylesAsync();
+    console.log("   📦 Estilos locais encontrados:", localTextStyles.length);
+
+    let libraryStyleCount = 0;
 
     for (const style of localTextStyles) {
         try {
@@ -434,8 +460,14 @@ async function collectAppliedTextTokens(
                         fontSize = style.fontSize;
                     }
 
+                    // 🔥 Identifica se é de biblioteca
+                    const isRemote = style.remote || false;
+                    const prefix = isRemote ? "📚 " : "";
+                    
+                    if (isRemote) libraryStyleCount++;
+
                     tokenSet.set(key, {
-                        name: style.name,
+                        name: prefix + style.name,
                         styleId: style.id,
                         fontFamily,
                         fontStyle,
@@ -450,6 +482,9 @@ async function collectAppliedTextTokens(
             // Ignora erros ao processar estilo
         }
     }
+    
+    console.log("   📚 Estilos de biblioteca encontrados:", libraryStyleCount);
+    console.log("   ✅ Total de estilos disponíveis:", tokenSet.size);
 
     // Busca nos frames selecionados (sobrescreve se encontrar)
     for (const frame of frames) {
@@ -467,7 +502,7 @@ async function collectAppliedTextTokens(
         });
     }
 
-    // Limita a 10 tokens
+    // Limita a 6 tokens
     return tokens.slice(0, 6);
 }
 

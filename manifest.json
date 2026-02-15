@@ -7,7 +7,12 @@
   "editorType": ["figma"],
   "documentAccess": "dynamic-page",
   "networkAccess": {
-    "allowedDomains": ["https://fonts.googleapis.com",
-    "https://fonts.gstatic.com"]
-  }
+    "allowedDomains": [
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com"
+    ]
+  },
+  "permissions": [
+    "teamlibrary"
+  ]
 }
