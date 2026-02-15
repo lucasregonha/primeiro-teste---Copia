@@ -69,6 +69,23 @@ function removeTokenPrefix(tokenName: string): string {
     return tokenName;
 }
 
+// 🔥 NOVA FUNÇÃO: Extrai o peso legível do fontStyle do Figma
+function extractReadableWeight(fontStyle: string): string {
+    const styleLower = fontStyle.toLowerCase();
+    
+    if (styleLower.includes("thin")) return "Thin";
+    if (styleLower.includes("extralight") || styleLower.includes("extra light")) return "ExtraLight";
+    if (styleLower.includes("light") && !styleLower.includes("extralight")) return "Light";
+    if (styleLower.includes("medium")) return "Medium";
+    if (styleLower.includes("semibold") || styleLower.includes("semi bold")) return "SemiBold";
+    if (styleLower.includes("extrabold") || styleLower.includes("extra bold")) return "ExtraBold";
+    if (styleLower.includes("bold") && !styleLower.includes("semibold") && !styleLower.includes("extrabold")) return "Bold";
+    if (styleLower.includes("black") || styleLower.includes("heavy")) return "Black";
+    if (styleLower.includes("regular") || styleLower.includes("normal")) return "Regular";
+    
+    return "Regular";
+}
+
 // Função para aplicar um token de tipografia em múltiplos TextNodes
 async function applyTypographyToken(nodeIds: string[], styleId: string) {
     for (const id of nodeIds) {
@@ -541,7 +558,7 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
 
 
 
-// Analisa tipografias sem tokens
+// 🔥 CORRIGIDO: Analisa tipografias sem tokens e inclui readableWeight
 async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
     const map = new Map<string, { nodeId: string; node: TextNode; style: CustomTextStyle }[]>();
 
@@ -555,9 +572,13 @@ async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNo
         const lineHeight = node.lineHeight !== figma.mixed ? node.lineHeight : "AUTO";
         const letterSpacing = node.letterSpacing !== figma.mixed ? node.letterSpacing : "0";
 
+        // 🔥 NOVO: Extrai peso legível do fontStyle
+        const readableWeight = extractReadableWeight(fontName.style);
+
         const style: CustomTextStyle = {
             fontFamily: fontName.family,
             fontStyle: fontName.style,
+            readableWeight: readableWeight, // 🔥 NOVO
             fontSize: fontSize,
             fontWeight: fontWeight,
             lineHeight: lineHeight,
@@ -595,7 +616,7 @@ async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNo
         return {
             style: first,
             nodeStyles,
-            label: `${first.fontFamily} ${first.fontStyle}`
+            label: `${first.fontFamily} ${first.readableWeight}` // 🔥 MODIFICADO: usa readableWeight
         };
     });
 
@@ -607,6 +628,7 @@ async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNo
 interface CustomTextStyle {
     fontFamily: string;
     fontStyle: string;
+    readableWeight?: string; // 🔥 NOVO
     fontSize: any;
     fontWeight: any;
     lineHeight: any;
@@ -889,7 +911,6 @@ figma.ui.onmessage = async (msg) => {
             // Aplica em fill ou stroke dependendo do contexto
             if (isStroke && "setStrokeStyleIdAsync" in node) {
                 await node.setStrokeStyleIdAsync(styleId);
-                // 🔥 NÃO marca como aplicado - permite reaplicar
 
                 figma.ui.postMessage({
                     type: "update-detail",
@@ -899,7 +920,6 @@ figma.ui.onmessage = async (msg) => {
                 });
             } else if (!isStroke && "setFillStyleIdAsync" in node) {
                 await node.setFillStyleIdAsync(styleId);
-                // 🔥 NÃO marca como aplicado - permite reaplicar
 
                 figma.ui.postMessage({
                     type: "update-detail",
@@ -939,16 +959,12 @@ figma.ui.onmessage = async (msg) => {
                     if (style && style.type === "TEXT") {
                         await figma.loadFontAsync(style.fontName as FontName);
                         await node.setTextStyleIdAsync(styleId);
-
-                        // 🔥 NÃO marca como aplicado - permite reaplicar
                     }
                 } else if (isStroke && "setStrokeStyleIdAsync" in node) {
                     await node.setStrokeStyleIdAsync(styleId);
-                    // 🔥 NÃO marca como aplicado - permite reaplicar
 
                 } else if (!isStroke && "setFillStyleIdAsync" in node) {
                     await node.setFillStyleIdAsync(styleId);
-                    // 🔥 NÃO marca como aplicado - permite reaplicar
                 }
 
                 if (style) {
@@ -1188,7 +1204,7 @@ figma.ui.onmessage = async (msg) => {
         figma.ui.postMessage({ type: "token-removed-success" });
     }
 
-    // 🔥 NOVO: Remove token de texto
+    // 🔥 CORRIGIDO E SIMPLIFICADO: Remove token de texto
     if (msg.type === "remove-text-token") {
         console.log("📩 remove-text-token recebido:", msg);
         const nodeIds: string[] = msg.nodeIds || [];
@@ -1197,63 +1213,71 @@ figma.ui.onmessage = async (msg) => {
             const node = await figma.getNodeByIdAsync(nodeId);
             
             if (node && node.type === "TEXT") {
-                console.log("✅ Removendo token de:", node.name);
+                console.log("✅ Processando node:", node.name);
                 console.log("   textStyleId atual:", node.textStyleId);
                 
-                // 🔥 Tenta restaurar estado original se existir
-                const originalState = originalNodeStates.get(nodeId);
-                
                 try {
-                    if (originalState && originalState.textStyleId !== undefined) {
-                        // Restaura para o estado original
-                        console.log("✅ Restaurando estado original");
-                        console.log("   textStyleId original:", originalState.textStyleId);
+                    // 🔥 PASSO 1: Carregar a fonte atual
+                    if (node.fontName === figma.mixed) {
+                        console.log("   Fonte mista detectada");
+                        const uniqueFonts = new Set<string>();
                         
-                        // Carrega a fonte original
-                        if (originalState.fontName && originalState.fontName !== figma.mixed) {
-                            await figma.loadFontAsync(originalState.fontName as FontName);
+                        for (let i = 0; i < node.characters.length; i++) {
+                            const font = node.getRangeFontName(i, i + 1) as FontName;
+                            const fontKey = `${font.family}_${font.style}`;
+                            
+                            if (!uniqueFonts.has(fontKey)) {
+                                uniqueFonts.add(fontKey);
+                                await figma.loadFontAsync(font);
+                            }
                         }
-                        
-                        node.textStyleId = originalState.textStyleId as string;
-                        console.log("✅ Estado original restaurado");
-                        
                     } else {
-                        // Sem estado original, apenas remove o estilo
-                        console.log("⚠️ Sem estado original, apenas removendo textStyleId");
-                        
-                        // Se o texto tem fonte mista, carrega todas as fontes únicas
-                        if (node.fontName === figma.mixed) {
-                            console.log("   Fonte mista detectada, carregando fontes...");
-                            const uniqueFonts = new Set<string>();
-                            
-                            for (let i = 0; i < node.characters.length; i++) {
-                                const font = node.getRangeFontName(i, i + 1) as FontName;
-                                const fontKey = `${font.family}_${font.style}`;
-                                
-                                if (!uniqueFonts.has(fontKey)) {
-                                    uniqueFonts.add(fontKey);
-                                    await figma.loadFontAsync(font);
-                                }
-                            }
-                            
-                            // Remove o estilo de cada caractere
-                            for (let i = 0; i < node.characters.length; i++) {
-                                node.setRangeTextStyleId(i, i + 1, "");
-                            }
-                        } else {
-                            // Fonte única - remove normalmente
-                            const currentFont = node.fontName as FontName;
-                            await figma.loadFontAsync(currentFont);
-                            node.textStyleId = "";
-                        }
+                        const currentFont = node.fontName as FontName;
+                        await figma.loadFontAsync(currentFont);
                     }
                     
-                    console.log("✅ Token removido de:", node.name);
+                    // 🔥 PASSO 2: DETACH - A forma correta no Figma
+                    if (node.textStyleId && node.textStyleId !== "") {
+                        console.log("   Fazendo detach do estilo...");
+                        
+                        // Captura as propriedades atuais do texto
+                        const currentFontName = node.fontName;
+                        const currentFontSize = node.fontSize;
+                        const currentLetterSpacing = node.letterSpacing;
+                        const currentLineHeight = node.lineHeight;
+                        const currentTextCase = node.textCase;
+                        const currentTextDecoration = node.textDecoration;
+                        
+                        // Remove o estilo
+                        node.textStyleId = "";
+                        
+                        // 🔥 IMPORTANTE: Força o Figma a reconhecer a remoção
+                        if (currentFontName !== figma.mixed) {
+                            node.fontName = currentFontName as FontName;
+                        }
+                        if (currentFontSize !== figma.mixed) {
+                            node.fontSize = currentFontSize as number;
+                        }
+                        if (currentLetterSpacing !== figma.mixed) {
+                            node.letterSpacing = currentLetterSpacing as LetterSpacing;
+                        }
+                        if (currentLineHeight !== figma.mixed) {
+                            node.lineHeight = currentLineHeight as LineHeight;
+                        }
+                        if (currentTextCase !== figma.mixed) {
+                            node.textCase = currentTextCase as TextCase;
+                        }
+                        if (currentTextDecoration !== figma.mixed) {
+                            node.textDecoration = currentTextDecoration as TextDecoration;
+                        }
+                        
+                        console.log("   ✅ Estilo removido (detached)");
+                        console.log("   textStyleId final:", node.textStyleId);
+                    }
+                    
                 } catch (e) {
-                    console.error("❌ Erro ao remover estilo de texto:", e);
+                    console.error("❌ Erro ao remover estilo:", e);
                 }
-            } else {
-                console.log("❌ Node não é TEXT:", nodeId);
             }
         }
 

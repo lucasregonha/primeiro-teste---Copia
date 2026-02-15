@@ -765,6 +765,25 @@
   <script>
 
     // ui.ts
+
+    // ui.ts
+    
+    // 🔥 FUNÇÃO HELPER para extrair peso legível
+    function extractReadableWeight(fontStyle) {
+      const styleLower = fontStyle.toLowerCase();
+      if (styleLower.includes("thin")) return "Thin";
+      if (styleLower.includes("extralight") || styleLower.includes("extra light")) return "ExtraLight";
+      if (styleLower.includes("light") && !styleLower.includes("extralight")) return "Light";
+      if (styleLower.includes("medium")) return "Medium";
+      if (styleLower.includes("semibold") || styleLower.includes("semi bold") || styleLower.includes("semi-bold")) return "SemiBold";
+      if (styleLower.includes("extrabold") || styleLower.includes("extra bold") || styleLower.includes("extra-bold")) return "ExtraBold";
+      if (styleLower.includes("bold") && !styleLower.includes("semibold") && !styleLower.includes("extrabold")) return "Bold";
+      if (styleLower.includes("black") || styleLower.includes("heavy")) return "Black";
+      if (styleLower.includes("regular") || styleLower.includes("normal")) return "Regular";
+      return "Regular";
+    }
+    
+
     const splash = document.createElement('div');
 
     splash.style.position = 'fixed';
@@ -1373,6 +1392,7 @@
   <div class="app-wrapper-2">
     ${groups.map(g => {
         const style = g.style;
+        const readableWeight = style.readableWeight || extractReadableWeight(style.fontStyle);
         const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
         const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
 
@@ -1396,7 +1416,7 @@
           <!-- Informações da fonte -->
           <div class="group-info">
             <div class="group-info-top">
-              <strong class="hex">${style.fontFamily} ${cssFont.weight}</strong>
+              <strong class="hex">${style.fontFamily} ${readableWeight}</strong>
             </div>
 
             <div class="group-info-bottom">
