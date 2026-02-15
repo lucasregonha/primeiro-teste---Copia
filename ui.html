@@ -766,8 +766,7 @@
 
     // ui.ts
 
-    // ui.ts
-    
+
     // 🔥 FUNÇÃO HELPER para extrair peso legível
     function extractReadableWeight(fontStyle) {
       const styleLower = fontStyle.toLowerCase();
@@ -782,7 +781,7 @@
       if (styleLower.includes("regular") || styleLower.includes("normal")) return "Regular";
       return "Regular";
     }
-    
+
 
     const splash = document.createElement('div');
 
@@ -920,6 +919,27 @@
         },
         "*"
       );
+    }
+
+    // 🔥 NOVA FUNÇÃO: Remove token de cor
+    function removeColorToken(nodeIds, isStroke) {
+      parent.postMessage({
+        pluginMessage: {
+          type: "remove-color-token",
+          nodeIds,
+          isStroke
+        }
+      }, "*");
+    }
+
+    // 🔥 NOVA FUNÇÃO: Remove token de texto
+    function removeTextToken(nodeIds) {
+      parent.postMessage({
+        pluginMessage: {
+          type: "remove-text-token",
+          nodeIds
+        }
+      }, "*");
     }
 
 

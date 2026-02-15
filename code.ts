@@ -19,8 +19,15 @@ interface OriginalNodeState {
     textStyleId?: string | symbol;
     fills?: readonly Paint[];
     strokes?: readonly Paint[];
+    // 🔥 Propriedades completas de texto
     fontName?: FontName | symbol;
     fontSize?: number | symbol;
+    lineHeight?: LineHeight | symbol;
+    letterSpacing?: LetterSpacing | symbol;
+    textCase?: TextCase | symbol;
+    textDecoration?: TextDecoration | symbol;
+    paragraphSpacing?: number | symbol;
+    paragraphIndent?: number | symbol;
 }
 let originalNodeStates = new Map<string, OriginalNodeState>();
 
@@ -738,11 +745,18 @@ figma.ui.onmessage = async (msg) => {
     // 🔥 NOVO: Salvar estado original dos nodes
     if (msg.type === "save-original-state") {
         const nodeIds: string[] = msg.nodeIds || [];
+        console.log("========================================");
         console.log("📌 Salvando estado original de", nodeIds.length, "nodes");
+        console.log("========================================");
         
         for (const nodeId of nodeIds) {
             const node = await figma.getNodeByIdAsync(nodeId);
-            if (!node) continue;
+            if (!node) {
+                console.log("❌ Node não encontrado:", nodeId);
+                continue;
+            }
+
+            console.log("📝 Processando node:", node.name, "ID:", nodeId);
 
             const state: OriginalNodeState = {};
 
@@ -750,29 +764,68 @@ figma.ui.onmessage = async (msg) => {
             if (isSceneNode(node)) {
                 if ("fillStyleId" in node) {
                     state.fillStyleId = node.fillStyleId;
+                    console.log("   🎨 fillStyleId salvo:", state.fillStyleId);
                 }
                 if ("strokeStyleId" in node) {
                     state.strokeStyleId = node.strokeStyleId;
+                    console.log("   🎨 strokeStyleId salvo:", state.strokeStyleId);
                 }
                 if ("fills" in node) {
                     state.fills = JSON.parse(JSON.stringify(node.fills));
+                    console.log("   🎨 fills salvos (", (node.fills as readonly Paint[]).length, "itens)");
                 }
                 if ("strokes" in node) {
                     state.strokes = JSON.parse(JSON.stringify(node.strokes));
+                    console.log("   🎨 strokes salvos (", (node.strokes as readonly Paint[]).length, "itens)");
                 }
             }
 
-            // Salva estado de TEXTO
+            // Salva estado de TEXTO - TODAS as propriedades
             if (node.type === "TEXT") {
-                state.textStyleId = node.textStyleId;
-                state.fontName = node.fontName;
-                state.fontSize = node.fontSize;
+                try {
+                    console.log("   📖 É um TextNode, salvando propriedades...");
+                    console.log("   textStyleId antes:", node.textStyleId);
+                    console.log("   fontName antes:", node.fontName);
+                    console.log("   fontSize antes:", node.fontSize);
+                    
+                    // 🔥 Carrega a fonte antes de acessar propriedades
+                    if (node.fontName !== figma.mixed) {
+                        await figma.loadFontAsync(node.fontName as FontName);
+                        console.log("   ✅ Fonte carregada para salvar");
+                    }
+                    
+                    state.textStyleId = node.textStyleId;
+                    state.fontName = node.fontName;
+                    state.fontSize = node.fontSize;
+                    state.lineHeight = node.lineHeight;
+                    state.letterSpacing = node.letterSpacing;
+                    state.textCase = node.textCase;
+                    state.textDecoration = node.textDecoration;
+                    state.paragraphSpacing = node.paragraphSpacing;
+                    state.paragraphIndent = node.paragraphIndent;
+                    
+                    console.log("   ✅ Estado de texto salvo:");
+                    console.log("      - textStyleId:", state.textStyleId);
+                    console.log("      - fontName:", state.fontName);
+                    console.log("      - fontSize:", state.fontSize);
+                    console.log("      - lineHeight:", state.lineHeight);
+                    console.log("      - letterSpacing:", state.letterSpacing);
+                } catch (e) {
+                    console.error("❌ Erro ao salvar estado de texto:", e);
+                    if (e instanceof Error) {
+                        console.error("Stack:", e.stack);
+                    }
+                }
             }
 
             originalNodeStates.set(nodeId, state);
-            console.log("✅ Estado salvo para:", nodeId);
+            console.log("✅ Estado salvo no Map para nodeId:", nodeId);
+            console.log("   Total de estados salvos:", originalNodeStates.size);
         }
         
+        console.log("========================================");
+        console.log("✅ Salvamento concluído");
+        console.log("========================================");
         return;
     }
 
@@ -1150,7 +1203,7 @@ figma.ui.onmessage = async (msg) => {
         }
     }
 
-    // 🔥 NOVO: Remove token de cor
+    // 🔥 CORRIGIDO: Remove token de cor com logs detalhados
     if (msg.type === "remove-color-token") {
         console.log("📩 remove-color-token recebido:", msg);
         const nodeIds: string[] = msg.nodeIds || [];
@@ -1158,44 +1211,101 @@ figma.ui.onmessage = async (msg) => {
 
         for (const nodeId of nodeIds) {
             const node = await figma.getNodeByIdAsync(nodeId);
-            if (!node || !isSceneNode(node)) continue;
+            if (!node || !isSceneNode(node)) {
+                console.log("❌ Node não encontrado ou não é SceneNode:", nodeId);
+                continue;
+            }
 
-            console.log("✅ Removendo token de cor de:", node.name, "isStroke:", isStroke);
+            console.log("========================================");
+            console.log("✅ Processando node:", node.name);
+            console.log("   Tipo:", isStroke ? "STROKE" : "FILL");
+            console.log("   Node ID:", nodeId);
 
-            // 🔥 Tenta restaurar estado original se existir
-            const originalState = originalNodeStates.get(nodeId);
-            
-            if (originalState) {
-                console.log("✅ Restaurando estado original");
+            try {
+                // 🔥 Verificar se tem styleId aplicado
+                if (isStroke && "strokeStyleId" in node) {
+                    console.log("   strokeStyleId atual:", node.strokeStyleId);
+                } else if (!isStroke && "fillStyleId" in node) {
+                    console.log("   fillStyleId atual:", node.fillStyleId);
+                }
+
+                // 🔥 Buscar estado original
+                const originalState = originalNodeStates.get(nodeId);
                 
-                if (isStroke) {
-                    // Restaura stroke
-                    if (originalState.strokeStyleId !== undefined && "strokeStyleId" in node) {
-                        node.strokeStyleId = originalState.strokeStyleId as string;
-                        console.log("✅ strokeStyleId restaurado:", originalState.strokeStyleId);
+                if (originalState) {
+                    console.log("   📦 Estado original encontrado!");
+                    
+                    if (isStroke) {
+                        // ========== RESTAURAR STROKE ==========
+                        console.log("   🎨 Restaurando STROKE...");
+                        
+                        // Restaura strokeStyleId
+                        if (originalState.strokeStyleId !== undefined && "setStrokeStyleIdAsync" in node) {
+                            if (typeof originalState.strokeStyleId === 'string') {
+                                await node.setStrokeStyleIdAsync(originalState.strokeStyleId);
+                                console.log("   ✅ strokeStyleId restaurado:", originalState.strokeStyleId);
+                            } else if (originalState.strokeStyleId === figma.mixed) {
+                                await node.setStrokeStyleIdAsync("");
+                                console.log("   ✅ strokeStyleId removido (era mixed)");
+                            }
+                        }
+                        
+                        // Restaura strokes (cores originais)
+                        if (originalState.strokes !== undefined && "strokes" in node) {
+                            node.strokes = originalState.strokes as Paint[];
+                            console.log("   ✅ strokes restaurados (cores originais)");
+                        }
+                        
+                    } else {
+                        // ========== RESTAURAR FILL ==========
+                        console.log("   🎨 Restaurando FILL...");
+                        
+                        // Restaura fillStyleId
+                        if (originalState.fillStyleId !== undefined && "setFillStyleIdAsync" in node) {
+                            if (typeof originalState.fillStyleId === 'string') {
+                                await node.setFillStyleIdAsync(originalState.fillStyleId);
+                                console.log("   ✅ fillStyleId restaurado:", originalState.fillStyleId);
+                            } else if (originalState.fillStyleId === figma.mixed) {
+                                await node.setFillStyleIdAsync("");
+                                console.log("   ✅ fillStyleId removido (era mixed)");
+                            }
+                        }
+                        
+                        // Restaura fills (cores originais)
+                        if (originalState.fills !== undefined && "fills" in node) {
+                            node.fills = originalState.fills as Paint[];
+                            console.log("   ✅ fills restaurados (cores originais)");
+                        }
                     }
-                    if (originalState.strokes !== undefined && "strokes" in node) {
-                        node.strokes = originalState.strokes as Paint[];
-                        console.log("✅ strokes restaurados");
-                    }
+                    
+                    console.log("   ✅ SUCESSO! Estado original restaurado");
+                    
                 } else {
-                    // Restaura fill
-                    if (originalState.fillStyleId !== undefined && "fillStyleId" in node) {
-                        node.fillStyleId = originalState.fillStyleId as string;
-                        console.log("✅ fillStyleId restaurado:", originalState.fillStyleId);
-                    }
-                    if (originalState.fills !== undefined && "fills" in node) {
-                        node.fills = originalState.fills as Paint[];
-                        console.log("✅ fills restaurados");
+                    // ========== SEM ESTADO ORIGINAL ==========
+                    console.log("   ⚠️ Sem estado original, fazendo detach simples...");
+                    
+                    if (isStroke && "setStrokeStyleIdAsync" in node) {
+                        await node.setStrokeStyleIdAsync("");
+                        console.log("   ✅ strokeStyleId removido (detach)");
+                    } else if (!isStroke && "setFillStyleIdAsync" in node) {
+                        await node.setFillStyleIdAsync("");
+                        console.log("   ✅ fillStyleId removido (detach)");
                     }
                 }
-            } else {
-                // Se não tem estado original, apenas remove o estilo
-                console.log("⚠️ Sem estado original, apenas removendo styleId");
+                
+                // Log final
+                console.log("   ========================================");
                 if (isStroke && "strokeStyleId" in node) {
-                    node.strokeStyleId = "";
+                    console.log("   FINAL - strokeStyleId:", node.strokeStyleId);
                 } else if (!isStroke && "fillStyleId" in node) {
-                    node.fillStyleId = "";
+                    console.log("   FINAL - fillStyleId:", node.fillStyleId);
+                }
+                console.log("   ========================================");
+                
+            } catch (e) {
+                console.error("❌ Erro ao remover token de cor:", e);
+                if (e instanceof Error) {
+                    console.error("Stack:", e.stack);
                 }
             }
         }
@@ -1204,7 +1314,7 @@ figma.ui.onmessage = async (msg) => {
         figma.ui.postMessage({ type: "token-removed-success" });
     }
 
-    // 🔥 CORRIGIDO E SIMPLIFICADO: Remove token de texto
+    // 🔥 CORRIGIDO: Remove token de texto (detach style) e restaura propriedades originais
     if (msg.type === "remove-text-token") {
         console.log("📩 remove-text-token recebido:", msg);
         const nodeIds: string[] = msg.nodeIds || [];
@@ -1217,66 +1327,124 @@ figma.ui.onmessage = async (msg) => {
                 console.log("   textStyleId atual:", node.textStyleId);
                 
                 try {
-                    // 🔥 PASSO 1: Carregar a fonte atual
-                    if (node.fontName === figma.mixed) {
-                        console.log("   Fonte mista detectada");
-                        const uniqueFonts = new Set<string>();
+                    // 🔥 PASSO 1: Verificar se tem estilo aplicado
+                    if (!node.textStyleId || node.textStyleId === "") {
+                        console.log("   ⚠️ Node não tem textStyleId, pulando...");
+                        continue;
+                    }
+
+                    // 🔥 PASSO 2: Buscar estado original
+                    const originalState = originalNodeStates.get(nodeId);
+                    
+                    if (originalState && originalState.fontName && originalState.fontName !== figma.mixed) {
+                        console.log("   📦 Estado original encontrado!");
+                        console.log("   fontName original:", originalState.fontName);
+                        console.log("   fontSize original:", originalState.fontSize);
                         
-                        for (let i = 0; i < node.characters.length; i++) {
-                            const font = node.getRangeFontName(i, i + 1) as FontName;
-                            const fontKey = `${font.family}_${font.style}`;
-                            
-                            if (!uniqueFonts.has(fontKey)) {
-                                uniqueFonts.add(fontKey);
-                                await figma.loadFontAsync(font);
-                            }
+                        // 🔥 IMPORTANTE: Carregar a fonte original PRIMEIRO
+                        await figma.loadFontAsync(originalState.fontName as FontName);
+                        console.log("   ✅ Fonte original carregada");
+                        
+                        // 🔥 PASSO 3: Fazer DETACH (remover textStyleId) - USANDO ASYNC!
+                        await node.setTextStyleIdAsync("");
+                        console.log("   ✅ textStyleId removido (DETACH feito)");
+                        
+                        // 🔥 PASSO 4: Restaurar propriedades da fonte original
+                        node.fontName = originalState.fontName as FontName;
+                        console.log("   ✅ fontName restaurado");
+                        
+                        if (originalState.fontSize !== undefined && typeof originalState.fontSize === 'number') {
+                            node.fontSize = originalState.fontSize;
+                            console.log("   ✅ fontSize restaurado:", originalState.fontSize);
                         }
+                        
+                        if (originalState.lineHeight !== undefined && originalState.lineHeight !== figma.mixed) {
+                            node.lineHeight = originalState.lineHeight as LineHeight;
+                            console.log("   ✅ lineHeight restaurado");
+                        }
+                        
+                        if (originalState.letterSpacing !== undefined && originalState.letterSpacing !== figma.mixed) {
+                            node.letterSpacing = originalState.letterSpacing as LetterSpacing;
+                            console.log("   ✅ letterSpacing restaurado");
+                        }
+                        
+                        if (originalState.textCase !== undefined && originalState.textCase !== figma.mixed) {
+                            node.textCase = originalState.textCase as TextCase;
+                            console.log("   ✅ textCase restaurado");
+                        }
+                        
+                        if (originalState.textDecoration !== undefined && originalState.textDecoration !== figma.mixed) {
+                            node.textDecoration = originalState.textDecoration as TextDecoration;
+                            console.log("   ✅ textDecoration restaurado");
+                        }
+                        
+                        if (originalState.paragraphSpacing !== undefined && typeof originalState.paragraphSpacing === 'number') {
+                            node.paragraphSpacing = originalState.paragraphSpacing;
+                            console.log("   ✅ paragraphSpacing restaurado");
+                        }
+                        
+                        if (originalState.paragraphIndent !== undefined && typeof originalState.paragraphIndent === 'number') {
+                            node.paragraphIndent = originalState.paragraphIndent;
+                            console.log("   ✅ paragraphIndent restaurado");
+                        }
+                        
+                        console.log("   ✅ SUCESSO! Todas as propriedades restauradas");
+                        console.log("   textStyleId final:", node.textStyleId);
+                        
+                    } else if (originalState && originalState.textStyleId !== undefined && typeof originalState.textStyleId === 'string') {
+                        // Se tinha um textStyleId original (estava vinculado a outro estilo)
+                        console.log("   📦 Tinha textStyleId original:", originalState.textStyleId);
+                        
+                        if (originalState.textStyleId !== "") {
+                            // Restaura o estilo original
+                            try {
+                                const originalStyle = await figma.getStyleByIdAsync(originalState.textStyleId);
+                                if (originalStyle && originalStyle.type === "TEXT") {
+                                    await figma.loadFontAsync(originalStyle.fontName as FontName);
+                                    await node.setTextStyleIdAsync(originalState.textStyleId);
+                                    console.log("   ✅ textStyleId original restaurado:", originalState.textStyleId);
+                                }
+                            } catch (e) {
+                                console.log("   ⚠️ Erro ao carregar estilo original:", e);
+                                // Se falhar, faz detach simples
+                                if (node.fontName !== figma.mixed) {
+                                    await figma.loadFontAsync(node.fontName as FontName);
+                                }
+                                await node.setTextStyleIdAsync("");
+                                console.log("   ✅ Detach simples realizado");
+                            }
+                        } else {
+                            // textStyleId original era vazio, só faz detach
+                            if (node.fontName !== figma.mixed) {
+                                await figma.loadFontAsync(node.fontName as FontName);
+                            }
+                            await node.setTextStyleIdAsync("");
+                            console.log("   ✅ Detach realizado (original era vazio)");
+                        }
+                        
                     } else {
-                        const currentFont = node.fontName as FontName;
-                        await figma.loadFontAsync(currentFont);
+                        // Se não tem estado original, faz detach simples mantendo a aparência atual
+                        console.log("   ⚠️ Sem estado original salvo, fazendo detach mantendo aparência atual...");
+                        
+                        if (node.fontName !== figma.mixed) {
+                            await figma.loadFontAsync(node.fontName as FontName);
+                        }
+                        
+                        await node.setTextStyleIdAsync("");
+                        console.log("   ✅ Detach realizado");
                     }
                     
-                    // 🔥 PASSO 2: DETACH - A forma correta no Figma
-                    if (node.textStyleId && node.textStyleId !== "") {
-                        console.log("   Fazendo detach do estilo...");
-                        
-                        // Captura as propriedades atuais do texto
-                        const currentFontName = node.fontName;
-                        const currentFontSize = node.fontSize;
-                        const currentLetterSpacing = node.letterSpacing;
-                        const currentLineHeight = node.lineHeight;
-                        const currentTextCase = node.textCase;
-                        const currentTextDecoration = node.textDecoration;
-                        
-                        // Remove o estilo
-                        node.textStyleId = "";
-                        
-                        // 🔥 IMPORTANTE: Força o Figma a reconhecer a remoção
-                        if (currentFontName !== figma.mixed) {
-                            node.fontName = currentFontName as FontName;
-                        }
-                        if (currentFontSize !== figma.mixed) {
-                            node.fontSize = currentFontSize as number;
-                        }
-                        if (currentLetterSpacing !== figma.mixed) {
-                            node.letterSpacing = currentLetterSpacing as LetterSpacing;
-                        }
-                        if (currentLineHeight !== figma.mixed) {
-                            node.lineHeight = currentLineHeight as LineHeight;
-                        }
-                        if (currentTextCase !== figma.mixed) {
-                            node.textCase = currentTextCase as TextCase;
-                        }
-                        if (currentTextDecoration !== figma.mixed) {
-                            node.textDecoration = currentTextDecoration as TextDecoration;
-                        }
-                        
-                        console.log("   ✅ Estilo removido (detached)");
-                        console.log("   textStyleId final:", node.textStyleId);
-                    }
+                    console.log("   ========================================");
+                    console.log("   FINAL - textStyleId:", node.textStyleId);
+                    console.log("   FINAL - fontName:", node.fontName);
+                    console.log("   FINAL - fontSize:", node.fontSize);
+                    console.log("   ========================================");
                     
                 } catch (e) {
                     console.error("❌ Erro ao remover estilo:", e);
+                    if (e instanceof Error) {
+                        console.error("Stack:", e.stack);
+                    }
                 }
             }
         }
