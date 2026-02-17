@@ -1113,6 +1113,14 @@
       const msg = e.data.pluginMessage;
       console.log("Mensagem recebida:", msg.type);
 
+      if (msg.type === "frame-changed") {
+        if (currentView === "detail") {
+          showListView(); // ou a função que você usa para voltar à lista
+        }
+
+        currentView = "list";
+      }
+
       // Token aplicado com sucesso
       if (msg.type === "token-applied-success") {
         console.log("Token aplicado com sucesso!", msg);

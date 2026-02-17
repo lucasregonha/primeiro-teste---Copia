@@ -939,13 +939,19 @@ figma.on("selectionchange", () => {
             n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
     );
 
-    // 🔥 CORRIGIDO: Atualiza rootFrameId SEMPRE que houver seleção válida
+    // 🔥 Atualiza rootFrameId SEMPRE que houver seleção válida
     if (validNodes.length > 0) {
-        rootFrameId = validNodes[0].id;
-        console.log("🔄 rootFrameId atualizado:", rootFrameId);
+        const newFrameId = validNodes[0].id;
+        
+        // 🔥 Se mudou de frame, avisa a UI para sair dos detalhes
+        if (newFrameId !== rootFrameId) {
+            rootFrameId = newFrameId;
+            initialSelectionIds = validNodes.map(n => n.id);
+            console.log("🔄 Novo frame selecionado:", validNodes[0].name);
+            // Sinaliza para a UI que o frame mudou (para sair dos detalhes se estiver neles)
+            figma.ui.postMessage({ type: "frame-changed" });
+        }
     }
-
-
 
     if (validNodes.length === 0) {
         figma.ui.postMessage({ type: "empty", clearAll: true });
@@ -1223,6 +1229,7 @@ figma.ui.onmessage = async (msg) => {
         const styleId = msg.styleId;
         const nodeIds: string[] = msg.nodeIds || [];
         const isStroke = msg.isStroke || false;
+        let lastDisplayName = styleId;
 
         for (const nodeId of nodeIds) {
             const node = await figma.getNodeByIdAsync(nodeId);
@@ -1245,10 +1252,11 @@ figma.ui.onmessage = async (msg) => {
                     node.strokes = newStrokes;
                 }
 
+                lastDisplayName = removeTokenPrefix(variable.name);
                 figma.ui.postMessage({
                     type: "update-detail",
                     nodeId: node.id,
-                    styleName: variable.name,
+                    styleName: lastDisplayName,
                     styleId: variable.id
                 });
             } else {
@@ -1262,16 +1270,17 @@ figma.ui.onmessage = async (msg) => {
                     await node.setFillStyleIdAsync(styleId);
                 }
 
+                lastDisplayName = removeTokenPrefix(style.name);
                 figma.ui.postMessage({
                     type: "update-detail",
                     nodeId: node.id,
-                    styleName: style.name,
+                    styleName: lastDisplayName,
                     styleId: style.id
                 });
             }
         }
 
-        figma.ui.postMessage({ type: "token-applied-success", styleId });
+        figma.ui.postMessage({ type: "token-applied-success", styleName: lastDisplayName, styleId });
     }
 
 
@@ -1318,7 +1327,8 @@ figma.ui.onmessage = async (msg) => {
                     }
                 }
 
-                const displayName = variable ? variable.name : (await figma.getStyleByIdAsync(styleId))?.name || styleId;
+                const rawName = variable ? variable.name : (await figma.getStyleByIdAsync(styleId))?.name || styleId;
+                const displayName = removeTokenPrefix(rawName);
                 figma.ui.postMessage({
                     type: "update-detail",
                     nodeId: node.id,
@@ -1327,7 +1337,12 @@ figma.ui.onmessage = async (msg) => {
                 });
             }));
 
-            figma.ui.postMessage({ type: "token-applied-success", styleId });
+            const rawName = variable ? variable.name : (await figma.getStyleByIdAsync(styleId))?.name || styleId;
+            figma.ui.postMessage({ 
+                type: "token-applied-success", 
+                styleName: removeTokenPrefix(rawName),
+                styleId 
+            });
 
         } catch (err) {
             console.error("Erro ao aplicar token:", err);
@@ -1778,4 +1793,4 @@ figma.ui.postMessage({ type: "init-tab", tab: currentTab });
     }
 })();
 
-console.log("Plugin iniciado ✅");
+console.log("Plugin iniciado ✅");  
