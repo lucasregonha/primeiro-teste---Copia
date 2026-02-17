@@ -84,6 +84,16 @@ function removeTokenPrefix(tokenName: string): string {
     return result;
 }
 
+// 🔥 Verifica se um nome de token é válido para exibição (não é interno/privado)
+function isValidTokenName(name: string): boolean {
+    const trimmed = name.trim();
+    // Ignora tokens que começam com _ ou / (convenção de privado no Figma)
+    if (trimmed.startsWith('_') || trimmed.startsWith('/')) return false;
+    // Ignora tokens vazios
+    if (trimmed.length === 0) return false;
+    return true;
+}
+
 // 🔥 NOVA FUNÇÃO: Extrai o peso legível do fontStyle do Figma
 function extractReadableWeight(fontStyle: string): string {
     const styleLower = fontStyle.toLowerCase();
@@ -425,14 +435,13 @@ async function collectAppliedColorTokens(
 
     console.log("🔍 Coletando estilos de cor de TODO o arquivo...");
     
-    // 🔥 Coleta todos os styleIds usados em TODAS as páginas do arquivo
     const styleIdsInFile = new Set<string>();
     let nodesProcessed = 0;
     let nodesWithFillStyle = 0;
     let nodesWithStrokeStyle = 0;
+    let nodesWithVariable = 0;
     
     async function collectStyleIds(node: BaseNode) {
-        // 🔥 Se não é SceneNode (ex: PAGE), ainda processa os filhos
         if (!isSceneNode(node)) {
             if ("children" in node) {
                 for (const child of node.children) {
@@ -444,34 +453,83 @@ async function collectAppliedColorTokens(
         
         nodesProcessed++;
         
-        // 🔥 Log especial para frames com estilo
-        if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
-            if ("fillStyleId" in node && typeof node.fillStyleId === "string" && node.fillStyleId !== "") {
-                console.log(`   🖼️ FRAME com FILL: "${node.name}" | styleId: ${node.fillStyleId}`);
-            }
-            if ("strokeStyleId" in node && typeof node.strokeStyleId === "string" && node.strokeStyleId !== "") {
-                console.log(`   🖼️ FRAME com STROKE: "${node.name}" | styleId: ${node.strokeStyleId}`);
-            }
-        }
-        
-        // Coleta fillStyleId (incluindo de TEXTOS)
+        // 🔥 1) Coleta via fillStyleId (estilo aplicado diretamente)
         if ("fillStyleId" in node && typeof node.fillStyleId === "string" && node.fillStyleId !== "") {
             nodesWithFillStyle++;
             styleIdsInFile.add(node.fillStyleId);
-            
-            // Log diferente para textos
-            if (node.type === "TEXT") {
-                console.log(`   ✏️ COR DE TEXTO: "${node.name}" | styleId: ${node.fillStyleId}`);
-            } else {
-                console.log(`   🎨 FILL: "${node.name}" | styleId: ${node.fillStyleId}`);
-            }
         }
         
-        // Coleta strokeStyleId
+        // 🔥 2) Coleta via strokeStyleId
         if ("strokeStyleId" in node && typeof node.strokeStyleId === "string" && node.strokeStyleId !== "") {
             nodesWithStrokeStyle++;
             styleIdsInFile.add(node.strokeStyleId);
-            console.log(`   🖍️ STROKE: "${node.name}" | styleId: ${node.strokeStyleId}`);
+        }
+        
+        // 🔥 3) NOVO: Coleta via boundVariables (quando usa variável de cor)
+        if ("boundVariables" in node && node.boundVariables) {
+            const bv = node.boundVariables as Record<string, any>;
+            
+            // fills podem ter variáveis bound
+            const fillVars = bv["fills"];
+            if (Array.isArray(fillVars)) {
+                for (const v of fillVars) {
+                    if (v?.type === "VARIABLE_ALIAS" && v?.id) {
+                        nodesWithVariable++;
+                        try {
+                            const variable = await figma.variables.getVariableByIdAsync(v.id);
+                            if (variable && variable.resolvedType === "COLOR") {
+                                // Converte variável para pseudo-token
+                                const varKey = `var_${variable.id}`;
+                                const cleanName = removeTokenPrefix(variable.name);
+                                if (!tokenSet.has(varKey) && isValidTokenName(cleanName)) {
+                                    // Tenta pegar a cor resolvida do node
+                                    const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
+                                    const solidFill = fills.find((f: any) => f.type === "SOLID");
+                                    const hex = solidFill ? rgbToHex(solidFill.color) : "#000000";
+                                    
+                                    tokenSet.set(varKey, {
+                                        name: cleanName,
+                                        hex,
+                                        styleId: variable.id
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            // Ignora erro de variável
+                        }
+                    }
+                }
+            }
+            
+            // strokes também podem ter variáveis
+            const strokeVars = bv["strokes"];
+            if (Array.isArray(strokeVars)) {
+                for (const v of strokeVars) {
+                    if (v?.type === "VARIABLE_ALIAS" && v?.id) {
+                        nodesWithVariable++;
+                        try {
+                            const variable = await figma.variables.getVariableByIdAsync(v.id);
+                            if (variable && variable.resolvedType === "COLOR") {
+                                const varKey = `var_${variable.id}`;
+                                const cleanName = removeTokenPrefix(variable.name);
+                                if (!tokenSet.has(varKey) && isValidTokenName(cleanName)) {
+                                    const strokes = "strokes" in node && Array.isArray(node.strokes) ? node.strokes : [];
+                                    const solidStroke = strokes.find((s: any) => s.type === "SOLID");
+                                    const hex = solidStroke ? rgbToHex(solidStroke.color) : "#000000";
+                                    
+                                    tokenSet.set(varKey, {
+                                        name: cleanName,
+                                        hex,
+                                        styleId: variable.id
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            // Ignora erro de variável
+                        }
+                    }
+                }
+            }
         }
         
         // Recursivo
@@ -482,10 +540,7 @@ async function collectAppliedColorTokens(
         }
     }
     
-    // 🔥 Percorre TODAS as páginas do arquivo
     console.log("   📄 Percorrendo todas as páginas...");
-    
-    // 🔥 IMPORTANTE: Carrega todas as páginas primeiro
     await figma.loadAllPagesAsync();
     console.log("   ✅ Páginas carregadas");
     
@@ -496,22 +551,11 @@ async function collectAppliedColorTokens(
     console.log("   📊 Nodes processados:", nodesProcessed);
     console.log("   📊 Nodes com fillStyle:", nodesWithFillStyle);
     console.log("   📊 Nodes com strokeStyle:", nodesWithStrokeStyle);
-    console.log("   📌 Style IDs únicos encontrados:", styleIdsInFile.size);
+    console.log("   📊 Nodes com variável:", nodesWithVariable);
+    console.log("   📌 Style IDs únicos (estilos):", styleIdsInFile.size);
+    console.log("   📌 Tokens via variável:", tokenSet.size);
     
-    // 🔥 Se não encontrou nenhum estilo aplicado, busca estilos locais como fallback
-    if (styleIdsInFile.size === 0) {
-        console.log("   ⚠️ Nenhum estilo aplicado encontrado, buscando estilos locais...");
-        const localStyles = await figma.getLocalPaintStylesAsync();
-        console.log("   📦 Estilos locais disponíveis:", localStyles.length);
-        
-        for (const style of localStyles) {
-            styleIdsInFile.add(style.id);
-        }
-        
-        console.log("   ✅ Usando", styleIdsInFile.size, "estilos locais como opções");
-    }
-    
-    // 🔥 Busca os estilos por ID (funciona para locais E bibliotecas)
+    // Busca os estilos por ID
     let localCount = 0;
     let libraryCount = 0;
     let successCount = 0;
@@ -536,7 +580,6 @@ async function collectAppliedColorTokens(
                             localCount++;
                         }
                         
-                        // 🔥 Sem emoji, só o nome limpo
                         tokenSet.set(styleId, {
                             name: removeTokenPrefix(paintStyle.name),
                             hex,
@@ -552,11 +595,10 @@ async function collectAppliedColorTokens(
         }
     }
     
-    console.log("   📦 Estilos locais encontrados:", localCount);
-    console.log("   📚 Estilos de biblioteca encontrados:", libraryCount);
-    console.log("   ✅ Total de tokens disponíveis:", successCount);
+    console.log("   📦 Estilos locais:", localCount);
+    console.log("   📚 Estilos de biblioteca:", libraryCount);
+    console.log("   ✅ Total de tokens disponíveis:", tokenSet.size);
 
-    // 🔥 Retorna TODOS os tokens (sem limite)
     return Array.from(tokenSet.values());
 }
 
@@ -1071,11 +1113,9 @@ figma.ui.onmessage = async (msg) => {
     }
 
     if (msg.type === "enter-list-view") {
-        // 🔒 Salva a seleção inicial se ainda não foi salva
-        if (!initialSelectionIds) {
-            initialSelectionIds = figma.currentPage.selection.map(n => n.id);
-            console.log("📌 seleção inicial salva:", initialSelectionIds);
-        }
+        // 🔥 CORRIGIDO: Sempre atualiza a seleção inicial com a seleção atual
+        initialSelectionIds = figma.currentPage.selection.map(n => n.id);
+        console.log("📌 seleção inicial atualizada:", initialSelectionIds);
 
         // 🔥 Garante que temos um rootFrameId salvo
         const validNodes = figma.currentPage.selection.filter(
@@ -1083,9 +1123,9 @@ figma.ui.onmessage = async (msg) => {
                 n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
         );
 
-        if (validNodes.length > 0 && !rootFrameId) {
+        if (validNodes.length > 0) {
             rootFrameId = validNodes[0].id;
-            console.log("📌 rootFrameId salvo:", rootFrameId);
+            console.log("📌 rootFrameId atualizado:", rootFrameId);
         }
     }
 
@@ -1184,36 +1224,43 @@ figma.ui.onmessage = async (msg) => {
         const nodeIds: string[] = msg.nodeIds || [];
         const isStroke = msg.isStroke || false;
 
-        const style = await figma.getStyleByIdAsync(styleId);
-
-        if (!style) {
-            console.log("❌ Style não encontrado");
-            figma.ui.postMessage({ type: "token-applied-error" });
-            return;
-        }
-
-        if (style.type !== "PAINT") {
-            console.log("❌ Style não é PAINT, type atual:", style.type);
-            figma.ui.postMessage({ type: "token-applied-error" });
-            return;
-        }
-
         for (const nodeId of nodeIds) {
             const node = await figma.getNodeByIdAsync(nodeId);
             if (!node || !isSceneNode(node)) continue;
 
-            // Aplica em fill ou stroke dependendo do contexto
-            if (isStroke && "setStrokeStyleIdAsync" in node) {
-                await node.setStrokeStyleIdAsync(styleId);
+            // 🔥 Tenta aplicar como variável primeiro (styleId pode ser um variableId)
+            const variable = await figma.variables.getVariableByIdAsync(styleId).catch(() => null);
+
+            if (variable && variable.resolvedType === "COLOR") {
+                // Aplica como variável
+                if (!isStroke && "fills" in node && Array.isArray(node.fills) && node.fills.length > 0) {
+                    const newFills = node.fills.map((fill: Paint, i: number) =>
+                        i === 0 ? figma.variables.setBoundVariableForPaint(fill as SolidPaint, "color", variable) : fill
+                    );
+                    node.fills = newFills;
+                } else if (isStroke && "strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0) {
+                    const newStrokes = node.strokes.map((stroke: Paint, i: number) =>
+                        i === 0 ? figma.variables.setBoundVariableForPaint(stroke as SolidPaint, "color", variable) : stroke
+                    );
+                    node.strokes = newStrokes;
+                }
 
                 figma.ui.postMessage({
                     type: "update-detail",
                     nodeId: node.id,
-                    styleName: style.name,
-                    styleId: style.id
+                    styleName: variable.name,
+                    styleId: variable.id
                 });
-            } else if (!isStroke && "setFillStyleIdAsync" in node) {
-                await node.setFillStyleIdAsync(styleId);
+            } else {
+                // Aplica como estilo (Paint Style)
+                const style = await figma.getStyleByIdAsync(styleId);
+                if (!style || style.type !== "PAINT") continue;
+
+                if (isStroke && "setStrokeStyleIdAsync" in node) {
+                    await node.setStrokeStyleIdAsync(styleId);
+                } else if (!isStroke && "setFillStyleIdAsync" in node) {
+                    await node.setFillStyleIdAsync(styleId);
+                }
 
                 figma.ui.postMessage({
                     type: "update-detail",
@@ -1224,11 +1271,7 @@ figma.ui.onmessage = async (msg) => {
             }
         }
 
-        figma.ui.postMessage({
-            type: "token-applied-success",
-            styleName: style.name,
-            styleId: style.id
-        });
+        figma.ui.postMessage({ type: "token-applied-success", styleId });
     }
 
 
@@ -1237,15 +1280,14 @@ figma.ui.onmessage = async (msg) => {
     if (msg.type === "apply-token") {
         try {
             const styleId = msg.styleId;
-            const style = await figma.getStyleByIdAsync(styleId);
-
             const isStroke = msg.isStroke;
             const isText = msg.isText || false;
-
             const nodeIds: string[] = msg.nodeIds || [msg.nodeId];
             const nodes = await Promise.all(nodeIds.map(id => figma.getNodeByIdAsync(id)));
-
             const validNodes = nodes.filter((n): n is SceneNode => !!n && isSceneNode(n));
+
+            // 🔥 Verifica se é variável ou estilo
+            const variable = !isText ? await figma.variables.getVariableByIdAsync(styleId).catch(() => null) : null;
 
             await Promise.all(validNodes.map(async (node) => {
                 if (isText && node.type === "TEXT") {
@@ -1254,35 +1296,38 @@ figma.ui.onmessage = async (msg) => {
                         await figma.loadFontAsync(style.fontName as FontName);
                         await node.setTextStyleIdAsync(styleId);
                     }
-                } else if (isStroke && "setStrokeStyleIdAsync" in node) {
-                    await node.setStrokeStyleIdAsync(styleId);
-
-                } else if (!isStroke && "setFillStyleIdAsync" in node) {
-                    await node.setFillStyleIdAsync(styleId);
+                } else if (variable && variable.resolvedType === "COLOR") {
+                    // 🔥 Aplica como variável de cor
+                    if (!isStroke && "fills" in node && Array.isArray(node.fills) && node.fills.length > 0) {
+                        const newFills = node.fills.map((fill: Paint, i: number) =>
+                            i === 0 ? figma.variables.setBoundVariableForPaint(fill as SolidPaint, "color", variable) : fill
+                        );
+                        node.fills = newFills;
+                    } else if (isStroke && "strokes" in node && Array.isArray(node.strokes) && node.strokes.length > 0) {
+                        const newStrokes = node.strokes.map((stroke: Paint, i: number) =>
+                            i === 0 ? figma.variables.setBoundVariableForPaint(stroke as SolidPaint, "color", variable) : stroke
+                        );
+                        node.strokes = newStrokes;
+                    }
+                } else {
+                    // 🔥 Aplica como Paint Style
+                    if (isStroke && "setStrokeStyleIdAsync" in node) {
+                        await node.setStrokeStyleIdAsync(styleId);
+                    } else if (!isStroke && "setFillStyleIdAsync" in node) {
+                        await node.setFillStyleIdAsync(styleId);
+                    }
                 }
 
-                if (style) {
-                    figma.ui.postMessage({
-                        type: "update-detail",
-                        nodeId: node.id,
-                        styleName: style.name,
-                        styleId: style.id
-                    });
-                }
-
-
+                const displayName = variable ? variable.name : (await figma.getStyleByIdAsync(styleId))?.name || styleId;
+                figma.ui.postMessage({
+                    type: "update-detail",
+                    nodeId: node.id,
+                    styleName: displayName,
+                    styleId
+                });
             }));
 
-            if (!style) {
-                figma.ui.postMessage({ type: "token-applied-error" });
-                return;
-            }
-
-            figma.ui.postMessage({
-                type: "token-applied-success",
-                styleName: style.name,
-                styleId: style.id
-            });
+            figma.ui.postMessage({ type: "token-applied-success", styleId });
 
         } catch (err) {
             console.error("Erro ao aplicar token:", err);
@@ -1407,26 +1452,6 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "switch-tab") {
         currentTab = msg.tab;
-        
-        // 🔥 NOVO: Restaura seleção inicial ao trocar de guia
-        if (initialSelectionIds && initialSelectionIds.length > 0) {
-            console.log("🔄 Restaurando seleção ao trocar de guia:", initialSelectionIds);
-            
-            const nodes: SceneNode[] = [];
-            
-            for (const id of initialSelectionIds) {
-                const node = await figma.getNodeByIdAsync(id);
-                if (node && isSceneNode(node)) {
-                    nodes.push(node);
-                }
-            }
-
-            if (nodes.length > 0) {
-                ignoringSelectionChange = true;
-                figma.currentPage.selection = nodes;
-                figma.viewport.scrollAndZoomIntoView(nodes);
-            }
-        }
         
         const validNodes = figma.currentPage.selection.filter(
             (n): n is FrameNode | ComponentNode | InstanceNode =>
@@ -1729,6 +1754,28 @@ figma.ui.onmessage = async (msg) => {
 };
 
 /* ---------- INIT ---------- */
-figma.ui.postMessage({ type: "empty", clearAll: true });
 figma.ui.postMessage({ type: "init-tab", tab: currentTab });
+
+// 🔥 Verifica se já tem um frame selecionado ao abrir o plugin
+(async () => {
+    const validNodes = figma.currentPage.selection.filter(
+        (n): n is FrameNode | ComponentNode | InstanceNode =>
+            n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
+    );
+
+    if (validNodes.length > 0) {
+        rootFrameId = validNodes[0].id;
+        initialSelectionIds = validNodes.map(n => n.id);
+        console.log("✅ Frame já selecionado ao iniciar:", validNodes[0].name);
+
+        if (currentTab === "colors") {
+            analyzeColors(validNodes);
+        } else {
+            analyzeTypography(validNodes);
+        }
+    } else {
+        figma.ui.postMessage({ type: "empty", clearAll: true });
+    }
+})();
+
 console.log("Plugin iniciado ✅");
