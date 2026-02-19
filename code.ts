@@ -782,7 +782,9 @@ async function collectAppliedTextTokens(
 /* ---------- ANALYZE FUNCTIONS ---------- */
 
 // 🔥 CORRIGIDO: Analisa cores sem tokens, verificando fill E stroke separadamente
-async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
+async function analyzeColors(
+    nodes: (FrameNode | ComponentNode | InstanceNode | SectionNode)[]
+) {
     // Map: chave = label + tipo (fill/stroke)
     const map = new Map<
         string,
@@ -858,9 +860,10 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
     }
 
     // Percorre todos os frames selecionados
-    for (const frame of frames) {
-        await walk(frame);
+    for (const node of nodes) {
+        await walk(node);
     }
+
 
     // Cria array final para enviar à UI
     const groups = Array.from(map.values()).map(nodePaints => ({
@@ -874,7 +877,9 @@ async function analyzeColors(frames: (FrameNode | ComponentNode | InstanceNode)[
 
 
 // 🔥 CORRIGIDO: Analisa tipografias sem tokens e inclui readableWeight
-async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
+async function analyzeTypography(
+    nodes: (FrameNode | ComponentNode | InstanceNode | SectionNode)[]
+) {
     const map = new Map<string, { nodeId: string; node: TextNode; style: CustomTextStyle }[]>();
 
     async function processTextNode(node: TextNode): Promise<void> {
@@ -922,9 +927,10 @@ async function analyzeTypography(frames: (FrameNode | ComponentNode | InstanceNo
         }
     }
 
-    for (const frame of frames) {
-        await walk(frame);
+    for (const node of nodes) {
+        await walk(node);
     }
+
 
     const groups = Array.from(map.values()).map(nodeStyles => {
         const first = nodeStyles[0].style;
@@ -960,10 +966,35 @@ figma.on("selectionchange", () => {
         return;
     }
 
-    const validNodes = figma.currentPage.selection.filter(
-        (n): n is FrameNode | ComponentNode | InstanceNode =>
-            n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
-    );
+    const selection = figma.currentPage.selection;
+
+    if (selection.length === 0) {
+        figma.ui.postMessage({ type: "empty", clearAll: true });
+        return;
+    }
+
+    // 🔥 Resolve sempre para FRAME, COMPONENT, INSTANCE ou SECTION
+    let node: SceneNode | null = selection[0];
+
+    while (
+        node &&
+        node.type !== "FRAME" &&
+        node.type !== "COMPONENT" &&
+        node.type !== "INSTANCE" &&
+        node.type !== "SECTION"
+    ) {
+        node = node.parent as SceneNode;
+    }
+
+    if (!node) {
+        figma.ui.postMessage({ type: "empty", clearAll: true });
+        return;
+    }
+
+    const validNodes = [
+        node as FrameNode | ComponentNode | InstanceNode | SectionNode
+    ];
+
 
     // 🔥 Atualiza rootFrameId SEMPRE que houver seleção válida
     if (validNodes.length > 0) {
@@ -979,10 +1010,6 @@ figma.on("selectionchange", () => {
         }
     }
 
-    if (validNodes.length === 0) {
-        figma.ui.postMessage({ type: "empty", clearAll: true });
-        return;
-    }
 
     if (currentTab === "colors") {
         analyzeColors(validNodes);
