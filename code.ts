@@ -70,17 +70,17 @@ const VALID_TOKEN_PREFIXES = [
 // 🔥 ATUALIZADO: Remove TODOS os prefixos, não apenas o primeiro
 function removeTokenPrefix(tokenName: string): string {
     let result = tokenName;
-    
+
     // Remove emoji 📚 se existir
     result = result.replace(/^📚\s+/, '');
-    
+
     // Remove todos os prefixos válidos
     for (const prefix of VALID_TOKEN_PREFIXES) {
         if (result.startsWith(prefix)) {
             result = result.substring(prefix.length);
         }
     }
-    
+
     return result;
 }
 
@@ -97,7 +97,7 @@ function isValidTokenName(name: string): boolean {
 // 🔥 NOVA FUNÇÃO: Extrai o peso legível do fontStyle do Figma
 function extractReadableWeight(fontStyle: string): string {
     const styleLower = fontStyle.toLowerCase();
-    
+
     if (styleLower.includes("thin")) return "Thin";
     if (styleLower.includes("extralight") || styleLower.includes("extra light")) return "ExtraLight";
     if (styleLower.includes("light") && !styleLower.includes("extralight")) return "Light";
@@ -107,7 +107,7 @@ function extractReadableWeight(fontStyle: string): string {
     if (styleLower.includes("bold") && !styleLower.includes("semibold") && !styleLower.includes("extrabold")) return "Bold";
     if (styleLower.includes("black") || styleLower.includes("heavy")) return "Black";
     if (styleLower.includes("regular") || styleLower.includes("normal")) return "Regular";
-    
+
     return "Regular";
 }
 
@@ -181,19 +181,19 @@ function yieldToUI(): Promise<void> {
 // 🔥 NOVA FUNÇÃO: Busca estilos de BIBLIOTECAS usando teamLibrary
 async function getAllAvailableColorStyles(): Promise<PaintStyle[]> {
     const allStyles: PaintStyle[] = [];
-    
+
     console.log("🔍 Buscando estilos de cor...");
-    
+
     // 1️⃣ Estilos locais
     const localStyles = await figma.getLocalPaintStylesAsync();
     console.log("   📦 Estilos locais:", localStyles.length);
     allStyles.push(...localStyles);
-    
+
     // 2️⃣ Estilos de bibliotecas habilitadas
     try {
         const libraries = await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
         console.log("   📚 Bibliotecas disponíveis:", libraries.length);
-        
+
         // Pega componentes publicados de cada biblioteca
         for (const library of libraries) {
             try {
@@ -208,7 +208,7 @@ async function getAllAvailableColorStyles(): Promise<PaintStyle[]> {
     } catch (e) {
         console.log("   ⚠️ Erro ao acessar bibliotecas:", e);
     }
-    
+
     console.log("   ✅ Total de estilos encontrados:", allStyles.length);
     return allStyles;
 }
@@ -216,14 +216,14 @@ async function getAllAvailableColorStyles(): Promise<PaintStyle[]> {
 // 🔥 NOVA FUNÇÃO: Busca estilos de texto de bibliotecas
 async function getAllAvailableTextStyles(): Promise<TextStyle[]> {
     const allStyles: TextStyle[] = [];
-    
+
     console.log("🔍 Buscando estilos de texto...");
-    
+
     // 1️⃣ Estilos locais
     const localStyles = await figma.getLocalTextStylesAsync();
     console.log("   📦 Estilos locais:", localStyles.length);
     allStyles.push(...localStyles);
-    
+
     // 2️⃣ Busca em bibliotecas
     try {
         const libraries = await figma.teamLibrary.getAvailableLibraryVariableCollectionsAsync();
@@ -231,7 +231,7 @@ async function getAllAvailableTextStyles(): Promise<TextStyle[]> {
     } catch (e) {
         console.log("   ⚠️ Erro ao acessar bibliotecas:", e);
     }
-    
+
     console.log("   ✅ Total de estilos encontrados:", allStyles.length);
     return allStyles;
 }
@@ -240,27 +240,27 @@ async function getAllAvailableTextStyles(): Promise<TextStyle[]> {
 async function collectStylesFromPage(): Promise<{ paintStyles: Set<string>; textStyles: Set<string> }> {
     const paintStyles = new Set<string>();
     const textStyles = new Set<string>();
-    
+
     console.log("🔍 Coletando estilos usados na página...");
-    
+
     async function walk(node: BaseNode) {
         if (!isSceneNode(node)) return;
-        
+
         // Coleta fillStyleId
         if ("fillStyleId" in node && typeof node.fillStyleId === "string" && node.fillStyleId !== "") {
             paintStyles.add(node.fillStyleId);
         }
-        
+
         // Coleta strokeStyleId
         if ("strokeStyleId" in node && typeof node.strokeStyleId === "string" && node.strokeStyleId !== "") {
             paintStyles.add(node.strokeStyleId);
         }
-        
+
         // Coleta textStyleId
         if (node.type === "TEXT" && node.textStyleId && typeof node.textStyleId === "string" && node.textStyleId !== "") {
             textStyles.add(node.textStyleId);
         }
-        
+
         // Recursivo
         if ("children" in node) {
             for (const child of node.children) {
@@ -268,15 +268,15 @@ async function collectStylesFromPage(): Promise<{ paintStyles: Set<string>; text
             }
         }
     }
-    
+
     // Percorre TODAS as páginas
     for (const page of figma.root.children) {
         await walk(page);
     }
-    
+
     console.log("   🎨 Paint styles encontrados:", paintStyles.size);
     console.log("   ✏️ Text styles encontrados:", textStyles.size);
-    
+
     return { paintStyles, textStyles };
 }
 function calculateTextStyleDistance(
@@ -434,13 +434,13 @@ async function collectAppliedColorTokens(
     const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
 
     console.log("🔍 Coletando estilos de cor de TODO o arquivo...");
-    
+
     const styleIdsInFile = new Set<string>();
     let nodesProcessed = 0;
     let nodesWithFillStyle = 0;
     let nodesWithStrokeStyle = 0;
     let nodesWithVariable = 0;
-    
+
     async function collectStyleIds(node: BaseNode) {
         if (!isSceneNode(node)) {
             if ("children" in node) {
@@ -450,25 +450,25 @@ async function collectAppliedColorTokens(
             }
             return;
         }
-        
+
         nodesProcessed++;
-        
+
         // 🔥 1) Coleta via fillStyleId (estilo aplicado diretamente)
         if ("fillStyleId" in node && typeof node.fillStyleId === "string" && node.fillStyleId !== "") {
             nodesWithFillStyle++;
             styleIdsInFile.add(node.fillStyleId);
         }
-        
+
         // 🔥 2) Coleta via strokeStyleId
         if ("strokeStyleId" in node && typeof node.strokeStyleId === "string" && node.strokeStyleId !== "") {
             nodesWithStrokeStyle++;
             styleIdsInFile.add(node.strokeStyleId);
         }
-        
+
         // 🔥 3) NOVO: Coleta via boundVariables (quando usa variável de cor)
         if ("boundVariables" in node && node.boundVariables) {
             const bv = node.boundVariables as Record<string, any>;
-            
+
             // fills podem ter variáveis bound
             const fillVars = bv["fills"];
             if (Array.isArray(fillVars)) {
@@ -486,7 +486,7 @@ async function collectAppliedColorTokens(
                                     const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
                                     const solidFill = fills.find((f: any) => f.type === "SOLID");
                                     const hex = solidFill ? rgbToHex(solidFill.color) : "#000000";
-                                    
+
                                     tokenSet.set(varKey, {
                                         name: cleanName,
                                         hex,
@@ -500,7 +500,7 @@ async function collectAppliedColorTokens(
                     }
                 }
             }
-            
+
             // strokes também podem ter variáveis
             const strokeVars = bv["strokes"];
             if (Array.isArray(strokeVars)) {
@@ -516,7 +516,7 @@ async function collectAppliedColorTokens(
                                     const strokes = "strokes" in node && Array.isArray(node.strokes) ? node.strokes : [];
                                     const solidStroke = strokes.find((s: any) => s.type === "SOLID");
                                     const hex = solidStroke ? rgbToHex(solidStroke.color) : "#000000";
-                                    
+
                                     tokenSet.set(varKey, {
                                         name: cleanName,
                                         hex,
@@ -531,7 +531,7 @@ async function collectAppliedColorTokens(
                 }
             }
         }
-        
+
         // Recursivo
         if ("children" in node) {
             for (const child of node.children) {
@@ -539,53 +539,54 @@ async function collectAppliedColorTokens(
             }
         }
     }
-    
-    console.log("   📄 Percorrendo todas as páginas...");
-    await figma.loadAllPagesAsync();
-    console.log("   ✅ Páginas carregadas");
-    
-    for (const page of figma.root.children) {
-        await collectStyleIds(page);
-    }
-    
+
+    console.log("   📄 Percorrendo apenas a página atual...");
+    console.log(`   📄 Página atual: "${figma.currentPage.name}"`);
+
+    // 🔥 IMPORTANTE: carregar a página antes de acessar children
+    await figma.currentPage.loadAsync();
+
+    await collectStyleIds(figma.currentPage);
+
+
     console.log("   📊 Nodes processados:", nodesProcessed);
     console.log("   📊 Nodes com fillStyle:", nodesWithFillStyle);
     console.log("   📊 Nodes com strokeStyle:", nodesWithStrokeStyle);
     console.log("   📊 Nodes com variável:", nodesWithVariable);
     console.log("   📌 Style IDs únicos (estilos):", styleIdsInFile.size);
     console.log("   📌 Tokens via variável:", tokenSet.size);
-    
+
     // Busca os estilos por ID
     let localCount = 0;
     let libraryCount = 0;
     let successCount = 0;
-    
+
     for (const styleId of styleIdsInFile) {
         try {
             const style = await figma.getStyleByIdAsync(styleId);
-            
+
             if (style && style.type === "PAINT") {
                 const paintStyle = style as PaintStyle;
-                
+
                 if (paintStyle.paints && paintStyle.paints.length > 0) {
                     const firstPaint = paintStyle.paints[0];
-                    
+
                     if (firstPaint.type === "SOLID") {
                         const hex = rgbToHex(firstPaint.color);
                         const isRemote = paintStyle.remote || false;
-                        
+
                         if (isRemote) {
                             libraryCount++;
                         } else {
                             localCount++;
                         }
-                        
+
                         tokenSet.set(styleId, {
                             name: removeTokenPrefix(paintStyle.name),
                             hex,
                             styleId
                         });
-                        
+
                         successCount++;
                     }
                 }
@@ -594,7 +595,7 @@ async function collectAppliedColorTokens(
             console.log(`   ⚠️ Erro ao buscar style ${styleId}`);
         }
     }
-    
+
     console.log("   📦 Estilos locais:", localCount);
     console.log("   📚 Estilos de biblioteca:", libraryCount);
     console.log("   ✅ Total de tokens disponíveis:", tokenSet.size);
@@ -612,12 +613,12 @@ async function collectAppliedTextTokens(
     const tokenSet = new Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>();
 
     console.log("🔍 Coletando estilos de texto de TODO o arquivo...");
-    
+
     // 🔥 Coleta todos os textStyleIds usados em TODAS as páginas
     const styleIdsInFile = new Set<string>();
     let textNodesFound = 0;
     let textNodesWithStyle = 0;
-    
+
     async function collectStyleIds(node: BaseNode) {
         // 🔥 Se não é SceneNode (ex: PAGE), ainda processa os filhos
         if (!isSceneNode(node)) {
@@ -628,12 +629,12 @@ async function collectAppliedTextTokens(
             }
             return;
         }
-        
+
         if (node.type === "TEXT") {
             textNodesFound++;
             const styleIdValue = node.textStyleId === figma.mixed ? "MIXED" : (node.textStyleId || "");
             console.log(`   📝 Texto encontrado: "${node.name}" | textStyleId: "${styleIdValue}"`);
-            
+
             if (node.textStyleId && typeof node.textStyleId === "string" && node.textStyleId !== "") {
                 textNodesWithStyle++;
                 styleIdsInFile.add(node.textStyleId);
@@ -642,75 +643,69 @@ async function collectAppliedTextTokens(
                 console.log(`      ⚠️ SEM textStyleId`);
             }
         }
-        
+
         if ("children" in node) {
             for (const child of node.children) {
                 await collectStyleIds(child);
             }
         }
     }
-    
-    // 🔥 Percorre TODAS as páginas do arquivo
-    console.log("   📄 Percorrendo todas as páginas...");
-    
-    // 🔥 IMPORTANTE: Carrega todas as páginas primeiro
-    await figma.loadAllPagesAsync();
-    console.log("   ✅ Páginas carregadas");
-    
-    for (const page of figma.root.children) {
-        console.log(`   📄 Página: "${page.name}"`);
-        await collectStyleIds(page);
-    }
-    
+
+    console.log("   📄 Percorrendo apenas a página atual...");
+    console.log(`   📄 Página atual: "${figma.currentPage.name}"`);
+
+    await collectStyleIds(figma.currentPage);
+
+
     console.log("   📊 Textos encontrados:", textNodesFound);
     console.log("   📊 Textos com estilo:", textNodesWithStyle);
     console.log("   📌 Style IDs únicos encontrados:", styleIdsInFile.size);
-    
+
     // 🔥 Se não encontrou nenhum estilo aplicado, busca estilos locais como fallback
     if (styleIdsInFile.size === 0) {
         console.log("   ⚠️ Nenhum estilo aplicado encontrado, buscando estilos locais...");
         const localStyles = await figma.getLocalTextStylesAsync();
         console.log("   📦 Estilos locais disponíveis:", localStyles.length);
-        
+
         for (const style of localStyles) {
             styleIdsInFile.add(style.id);
             console.log(`      📝 Estilo local: "${style.name}" | ID: ${style.id}`);
         }
-        
+
         console.log("   ✅ Usando", styleIdsInFile.size, "estilos locais como opções");
     }
-    
+
     // 🔥 Busca os estilos por ID (funciona para locais E bibliotecas)
     let localCount = 0;
     let libraryCount = 0;
     let successCount = 0;
-    
+
     for (const styleId of styleIdsInFile) {
         try {
             console.log(`   🔎 Buscando estilo: ${styleId}`);
             const style = await figma.getStyleByIdAsync(styleId);
-            
+
             if (style && style.type === "TEXT") {
                 console.log(`      ✅ Estilo encontrado: "${style.name}" | remote: ${style.remote}`);
                 const textStyle = style as TextStyle;
-                
+
                 // Tenta carregar a fonte
                 if (textStyle.fontName && typeof textStyle.fontName === 'object' && 'family' in textStyle.fontName) {
                     try {
                         console.log(`      🔤 Carregando fonte: ${textStyle.fontName.family} ${textStyle.fontName.style}`);
                         await figma.loadFontAsync(textStyle.fontName as FontName);
-                        
+
                         const isRemote = textStyle.remote || false;
-                        
+
                         if (isRemote) {
                             libraryCount++;
                         } else {
                             localCount++;
                         }
-                        
+
                         // 🔥 Sem emoji, só o nome limpo
                         const key = `${textStyle.name}_${styleId}`;
-                        
+
                         tokenSet.set(key, {
                             name: textStyle.name,
                             styleId,
@@ -718,7 +713,7 @@ async function collectAppliedTextTokens(
                             fontStyle: textStyle.fontName.style,
                             fontSize: typeof textStyle.fontSize === 'number' ? textStyle.fontSize : undefined
                         });
-                        
+
                         successCount++;
                         console.log(`      ✅ Adicionado ao tokenSet`);
                     } catch (fontError) {
@@ -734,7 +729,7 @@ async function collectAppliedTextTokens(
             console.log(`      ❌ Erro ao buscar style ${styleId}:`, e);
         }
     }
-    
+
     console.log("   📦 Estilos locais encontrados:", localCount);
     console.log("   📚 Estilos de biblioteca encontrados:", libraryCount);
     console.log("   ✅ Total de tokens disponíveis:", successCount);
@@ -942,7 +937,7 @@ figma.on("selectionchange", () => {
     // 🔥 Atualiza rootFrameId SEMPRE que houver seleção válida
     if (validNodes.length > 0) {
         const newFrameId = validNodes[0].id;
-        
+
         // 🔥 Se mudou de frame, avisa a UI para sair dos detalhes
         if (newFrameId !== rootFrameId) {
             rootFrameId = newFrameId;
@@ -971,13 +966,13 @@ figma.ui.onmessage = async (msg) => {
     // 🔙 Voltar para lista - processar primeiro!
     if (msg.type === "back-to-list") {
         console.log("🔙 Voltando para lista...");
-        
+
         // 🔥 Restaura a seleção inicial
         if (initialSelectionIds && initialSelectionIds.length > 0) {
             console.log("📌 Restaurando seleção:", initialSelectionIds);
-            
+
             const nodes: SceneNode[] = [];
-            
+
             for (const id of initialSelectionIds) {
                 const node = await figma.getNodeByIdAsync(id);
                 if (node && isSceneNode(node)) {
@@ -988,10 +983,10 @@ figma.ui.onmessage = async (msg) => {
             if (nodes.length > 0) {
                 // 🔥 IMPORTANTE: Ignora apenas a próxima mudança de seleção
                 ignoringSelectionChange = true;
-                
+
                 figma.currentPage.selection = nodes;
                 figma.viewport.scrollAndZoomIntoView(nodes);
-                
+
                 console.log("✅ Seleção restaurada:", nodes.map(n => n.name));
 
                 // 🔄 Aguarda um momento para garantir que a seleção foi aplicada
@@ -1037,7 +1032,7 @@ figma.ui.onmessage = async (msg) => {
         console.log("========================================");
         console.log("📌 Salvando estado original de", nodeIds.length, "nodes");
         console.log("========================================");
-        
+
         for (const nodeId of nodeIds) {
             const node = await figma.getNodeByIdAsync(nodeId);
             if (!node) {
@@ -1076,13 +1071,13 @@ figma.ui.onmessage = async (msg) => {
                     console.log("   textStyleId antes:", node.textStyleId);
                     console.log("   fontName antes:", node.fontName);
                     console.log("   fontSize antes:", node.fontSize);
-                    
+
                     // 🔥 Carrega a fonte antes de acessar propriedades
                     if (node.fontName !== figma.mixed) {
                         await figma.loadFontAsync(node.fontName as FontName);
                         console.log("   ✅ Fonte carregada para salvar");
                     }
-                    
+
                     state.textStyleId = node.textStyleId;
                     state.fontName = node.fontName;
                     state.fontSize = node.fontSize;
@@ -1092,7 +1087,7 @@ figma.ui.onmessage = async (msg) => {
                     state.textDecoration = node.textDecoration;
                     state.paragraphSpacing = node.paragraphSpacing;
                     state.paragraphIndent = node.paragraphIndent;
-                    
+
                     console.log("   ✅ Estado de texto salvo:");
                     console.log("      - textStyleId:", state.textStyleId);
                     console.log("      - fontName:", state.fontName);
@@ -1111,7 +1106,7 @@ figma.ui.onmessage = async (msg) => {
             console.log("✅ Estado salvo no Map para nodeId:", nodeId);
             console.log("   Total de estados salvos:", originalNodeStates.size);
         }
-        
+
         console.log("========================================");
         console.log("✅ Salvamento concluído");
         console.log("========================================");
@@ -1338,10 +1333,10 @@ figma.ui.onmessage = async (msg) => {
             }));
 
             const rawName = variable ? variable.name : (await figma.getStyleByIdAsync(styleId))?.name || styleId;
-            figma.ui.postMessage({ 
-                type: "token-applied-success", 
+            figma.ui.postMessage({
+                type: "token-applied-success",
                 styleName: removeTokenPrefix(rawName),
-                styleId 
+                styleId
             });
 
         } catch (err) {
@@ -1353,7 +1348,7 @@ figma.ui.onmessage = async (msg) => {
     // 🔥 CORRIGIDO: Permite aplicar múltiplos estilos de fonte
     if (msg.type === "apply-typography-token-multiple") {
         console.log("📩 apply-typography-token-multiple recebido:", msg);
-        
+
         const styleId = msg.styleId;
         const nodeIds: string[] = msg.nodeIds || [];
 
@@ -1378,14 +1373,14 @@ figma.ui.onmessage = async (msg) => {
             if (node && node.type === "TEXT") {
                 try {
                     console.log("✅ Tentando aplicar em node:", node.name);
-                    
+
                     // 🔥 Carrega a fonte do ESTILO (não do node)
                     await figma.loadFontAsync(style.fontName as FontName);
                     await node.setTextStyleIdAsync(styleId);
-                    
+
                     successCount++;
                     console.log("✅ Aplicado com sucesso em:", node.name);
-                    
+
                     figma.ui.postMessage({
                         type: "update-detail",
                         nodeId: node.id,
@@ -1395,7 +1390,7 @@ figma.ui.onmessage = async (msg) => {
                 } catch (fontError) {
                     console.error("❌ Erro ao carregar fonte:", fontError);
                     errorNodes.push(node.name);
-                    
+
                     // Tenta carregar a fonte atual do node e aplicar o estilo mesmo assim
                     try {
                         const currentFont = node.fontName !== figma.mixed ? node.fontName : { family: "Inter", style: "Regular" };
@@ -1418,7 +1413,7 @@ figma.ui.onmessage = async (msg) => {
             if (errorNodes.length > 0) {
                 successMessage += ` (Fonte não disponível em ${errorNodes.length} elemento(s))`;
             }
-            
+
             figma.ui.postMessage({
                 type: "token-applied-success",
                 styleName: successMessage,
@@ -1426,7 +1421,7 @@ figma.ui.onmessage = async (msg) => {
             });
         } else {
             console.log("❌ Nenhum node foi atualizado");
-            figma.ui.postMessage({ 
+            figma.ui.postMessage({
                 type: "token-applied-error",
                 message: "Não foi possível aplicar o estilo. A fonte pode não estar disponível."
             });
@@ -1467,7 +1462,7 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "switch-tab") {
         currentTab = msg.tab;
-        
+
         const validNodes = figma.currentPage.selection.filter(
             (n): n is FrameNode | ComponentNode | InstanceNode =>
                 n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
@@ -1512,14 +1507,14 @@ figma.ui.onmessage = async (msg) => {
 
                 // 🔥 Buscar estado original
                 const originalState = originalNodeStates.get(nodeId);
-                
+
                 if (originalState) {
                     console.log("   📦 Estado original encontrado!");
-                    
+
                     if (isStroke) {
                         // ========== RESTAURAR STROKE ==========
                         console.log("   🎨 Restaurando STROKE...");
-                        
+
                         // Restaura strokeStyleId
                         if (originalState.strokeStyleId !== undefined && "setStrokeStyleIdAsync" in node) {
                             if (typeof originalState.strokeStyleId === 'string') {
@@ -1530,17 +1525,17 @@ figma.ui.onmessage = async (msg) => {
                                 console.log("   ✅ strokeStyleId removido (era mixed)");
                             }
                         }
-                        
+
                         // Restaura strokes (cores originais)
                         if (originalState.strokes !== undefined && "strokes" in node) {
                             node.strokes = originalState.strokes as Paint[];
                             console.log("   ✅ strokes restaurados (cores originais)");
                         }
-                        
+
                     } else {
                         // ========== RESTAURAR FILL ==========
                         console.log("   🎨 Restaurando FILL...");
-                        
+
                         // Restaura fillStyleId
                         if (originalState.fillStyleId !== undefined && "setFillStyleIdAsync" in node) {
                             if (typeof originalState.fillStyleId === 'string') {
@@ -1551,20 +1546,20 @@ figma.ui.onmessage = async (msg) => {
                                 console.log("   ✅ fillStyleId removido (era mixed)");
                             }
                         }
-                        
+
                         // Restaura fills (cores originais)
                         if (originalState.fills !== undefined && "fills" in node) {
                             node.fills = originalState.fills as Paint[];
                             console.log("   ✅ fills restaurados (cores originais)");
                         }
                     }
-                    
+
                     console.log("   ✅ SUCESSO! Estado original restaurado");
-                    
+
                 } else {
                     // ========== SEM ESTADO ORIGINAL ==========
                     console.log("   ⚠️ Sem estado original, fazendo detach simples...");
-                    
+
                     if (isStroke && "setStrokeStyleIdAsync" in node) {
                         await node.setStrokeStyleIdAsync("");
                         console.log("   ✅ strokeStyleId removido (detach)");
@@ -1573,7 +1568,7 @@ figma.ui.onmessage = async (msg) => {
                         console.log("   ✅ fillStyleId removido (detach)");
                     }
                 }
-                
+
                 // Log final
                 console.log("   ========================================");
                 if (isStroke && "strokeStyleId" in node) {
@@ -1582,7 +1577,7 @@ figma.ui.onmessage = async (msg) => {
                     console.log("   FINAL - fillStyleId:", node.fillStyleId);
                 }
                 console.log("   ========================================");
-                
+
             } catch (e) {
                 console.error("❌ Erro ao remover token de cor:", e);
                 if (e instanceof Error) {
@@ -1602,11 +1597,11 @@ figma.ui.onmessage = async (msg) => {
 
         for (const nodeId of nodeIds) {
             const node = await figma.getNodeByIdAsync(nodeId);
-            
+
             if (node && node.type === "TEXT") {
                 console.log("✅ Processando node:", node.name);
                 console.log("   textStyleId atual:", node.textStyleId);
-                
+
                 try {
                     // 🔥 PASSO 1: Verificar se tem estilo aplicado
                     if (!node.textStyleId || node.textStyleId === "") {
@@ -1616,66 +1611,66 @@ figma.ui.onmessage = async (msg) => {
 
                     // 🔥 PASSO 2: Buscar estado original
                     const originalState = originalNodeStates.get(nodeId);
-                    
+
                     if (originalState && originalState.fontName && originalState.fontName !== figma.mixed) {
                         console.log("   📦 Estado original encontrado!");
                         console.log("   fontName original:", originalState.fontName);
                         console.log("   fontSize original:", originalState.fontSize);
-                        
+
                         // 🔥 IMPORTANTE: Carregar a fonte original PRIMEIRO
                         await figma.loadFontAsync(originalState.fontName as FontName);
                         console.log("   ✅ Fonte original carregada");
-                        
+
                         // 🔥 PASSO 3: Fazer DETACH (remover textStyleId) - USANDO ASYNC!
                         await node.setTextStyleIdAsync("");
                         console.log("   ✅ textStyleId removido (DETACH feito)");
-                        
+
                         // 🔥 PASSO 4: Restaurar propriedades da fonte original
                         node.fontName = originalState.fontName as FontName;
                         console.log("   ✅ fontName restaurado");
-                        
+
                         if (originalState.fontSize !== undefined && typeof originalState.fontSize === 'number') {
                             node.fontSize = originalState.fontSize;
                             console.log("   ✅ fontSize restaurado:", originalState.fontSize);
                         }
-                        
+
                         if (originalState.lineHeight !== undefined && originalState.lineHeight !== figma.mixed) {
                             node.lineHeight = originalState.lineHeight as LineHeight;
                             console.log("   ✅ lineHeight restaurado");
                         }
-                        
+
                         if (originalState.letterSpacing !== undefined && originalState.letterSpacing !== figma.mixed) {
                             node.letterSpacing = originalState.letterSpacing as LetterSpacing;
                             console.log("   ✅ letterSpacing restaurado");
                         }
-                        
+
                         if (originalState.textCase !== undefined && originalState.textCase !== figma.mixed) {
                             node.textCase = originalState.textCase as TextCase;
                             console.log("   ✅ textCase restaurado");
                         }
-                        
+
                         if (originalState.textDecoration !== undefined && originalState.textDecoration !== figma.mixed) {
                             node.textDecoration = originalState.textDecoration as TextDecoration;
                             console.log("   ✅ textDecoration restaurado");
                         }
-                        
+
                         if (originalState.paragraphSpacing !== undefined && typeof originalState.paragraphSpacing === 'number') {
                             node.paragraphSpacing = originalState.paragraphSpacing;
                             console.log("   ✅ paragraphSpacing restaurado");
                         }
-                        
+
                         if (originalState.paragraphIndent !== undefined && typeof originalState.paragraphIndent === 'number') {
                             node.paragraphIndent = originalState.paragraphIndent;
                             console.log("   ✅ paragraphIndent restaurado");
                         }
-                        
+
                         console.log("   ✅ SUCESSO! Todas as propriedades restauradas");
                         console.log("   textStyleId final:", node.textStyleId);
-                        
+
                     } else if (originalState && originalState.textStyleId !== undefined && typeof originalState.textStyleId === 'string') {
                         // Se tinha um textStyleId original (estava vinculado a outro estilo)
                         console.log("   📦 Tinha textStyleId original:", originalState.textStyleId);
-                        
+
                         if (originalState.textStyleId !== "") {
                             // Restaura o estilo original
                             try {
@@ -1702,25 +1697,25 @@ figma.ui.onmessage = async (msg) => {
                             await node.setTextStyleIdAsync("");
                             console.log("   ✅ Detach realizado (original era vazio)");
                         }
-                        
+
                     } else {
                         // Se não tem estado original, faz detach simples mantendo a aparência atual
                         console.log("   ⚠️ Sem estado original salvo, fazendo detach mantendo aparência atual...");
-                        
+
                         if (node.fontName !== figma.mixed) {
                             await figma.loadFontAsync(node.fontName as FontName);
                         }
-                        
+
                         await node.setTextStyleIdAsync("");
                         console.log("   ✅ Detach realizado");
                     }
-                    
+
                     console.log("   ========================================");
                     console.log("   FINAL - textStyleId:", node.textStyleId);
                     console.log("   FINAL - fontName:", node.fontName);
                     console.log("   FINAL - fontSize:", node.fontSize);
                     console.log("   ========================================");
-                    
+
                 } catch (e) {
                     console.error("❌ Erro ao remover estilo:", e);
                     if (e instanceof Error) {
