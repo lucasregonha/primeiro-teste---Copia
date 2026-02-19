@@ -11,6 +11,11 @@ let ignoringSelectionChange = false;
 let rootFrameId: string | null = null;
 let initialSelectionIds: string[] | null = null;
 let nodesWithAppliedToken = new Set<string>();
+// 🔥 CACHE GLOBAL
+let cachedColorTokens: { name: string; hex: string; styleId?: string }[] | null = null;
+let cachedTextTokens: { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[] | null = null;
+let cachedPageId: string | null = null;
+
 
 // 🔥 NOVO: Armazena o estado original dos nodes antes de aplicar tokens
 interface OriginalNodeState {
@@ -431,6 +436,13 @@ async function collectAppliedColorTokens(
     frames: (FrameNode | ComponentNode | InstanceNode)[]
 ): Promise<{ name: string; hex: string; styleId?: string }[]> {
 
+    // 🔥 Se já temos cache válido, retorna ele
+    if (cachedColorTokens && cachedPageId === figma.currentPage.id) {
+        console.log("⚡ Usando cache de color tokens");
+        return cachedColorTokens;
+    }
+
+
     const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
 
     console.log("🔍 Coletando estilos de cor de TODO o arquivo...");
@@ -600,7 +612,14 @@ async function collectAppliedColorTokens(
     console.log("   📚 Estilos de biblioteca:", libraryCount);
     console.log("   ✅ Total de tokens disponíveis:", tokenSet.size);
 
-    return Array.from(tokenSet.values());
+    const result = Array.from(tokenSet.values());
+
+    // 🔥 Salva no cache
+    cachedColorTokens = result;
+    cachedPageId = figma.currentPage.id;
+
+    return result;
+
 }
 
 
@@ -610,6 +629,13 @@ async function collectAppliedTextTokens(
     frames: (FrameNode | ComponentNode | InstanceNode)[],
     currentStyle?: { fontFamily: string; fontSize?: number; fontWeight?: any }
 ): Promise<{ name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[]> {
+
+    if (cachedTextTokens && cachedPageId === figma.currentPage.id) {
+        console.log("⚡ Usando cache de text tokens");
+        return cachedTextTokens;
+    }
+
+
     const tokenSet = new Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>();
 
     console.log("🔍 Coletando estilos de texto de TODO o arquivo...");
@@ -746,7 +772,11 @@ async function collectAppliedTextTokens(
     }
 
     // 🔥 Retorna TODOS os tokens (sem limite)
+    cachedTextTokens = tokens;
+    cachedPageId = figma.currentPage.id;
+
     return tokens;
+
 }
 
 /* ---------- ANALYZE FUNCTIONS ---------- */
@@ -923,6 +953,7 @@ interface CustomTextStyle {
 /* ---------- EVENTS ---------- */
 
 figma.on("selectionchange", () => {
+
 
     if (ignoringSelectionChange) {
         ignoringSelectionChange = false;
