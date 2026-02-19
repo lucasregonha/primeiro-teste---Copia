@@ -969,6 +969,12 @@
     }
 
     function switchTab(tab) {
+
+      // 🔥 Se estiver em detalhe, executa o mesmo fluxo do botão voltar
+      if (viewMode === "detail") {
+        back(); // isso já envia back-to-list para o backend
+      }
+
       currentTab = tab;
 
       // Atualiza visual das tabs
@@ -979,11 +985,6 @@
       } else {
         tabs[1].classList.add("active");
       }
-
-      // Reseta view
-      viewMode = "list";
-      currentGroup = null;
-      appliedTokens = [];
 
       // Mostra loading
       showLoading();
