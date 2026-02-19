@@ -958,13 +958,16 @@ interface CustomTextStyle {
 
 /* ---------- EVENTS ---------- */
 
-figma.on("selectionchange", () => {
+figma.on("selectionchange", async () => {
 
+
+    console.log("SELECTION CHANGED");
 
     if (ignoringSelectionChange) {
-        ignoringSelectionChange = false;
         return;
     }
+
+
 
     const selection = figma.currentPage.selection;
 
@@ -973,7 +976,7 @@ figma.on("selectionchange", () => {
         return;
     }
 
-    // 🔥 Resolve sempre para FRAME, COMPONENT, INSTANCE ou SECTION
+    // 🔥 Resolve container raiz
     let node: SceneNode | null = selection[0];
 
     while (
@@ -986,37 +989,32 @@ figma.on("selectionchange", () => {
         node = node.parent as SceneNode;
     }
 
-    if (!node) {
-        figma.ui.postMessage({ type: "empty", clearAll: true });
-        return;
+    if (!node) return;
+
+    const container = node as FrameNode | ComponentNode | InstanceNode | SectionNode;
+
+    const newFrameId = container.id;
+    const frameChanged = newFrameId !== rootFrameId;
+
+    rootFrameId = newFrameId;
+
+    // 🔥 SEMPRE avisa UI que a seleção mudou
+    figma.ui.postMessage({ type: "selection-changed" });
+
+    // 🔥 Se mudou o frame, também avisa
+    if (frameChanged) {
+        figma.ui.postMessage({ type: "frame-changed" });
     }
 
-    const validNodes = [
-        node as FrameNode | ComponentNode | InstanceNode | SectionNode
-    ];
-
-
-    // 🔥 Atualiza rootFrameId SEMPRE que houver seleção válida
-    if (validNodes.length > 0) {
-        const newFrameId = validNodes[0].id;
-
-        // 🔥 Se mudou de frame, avisa a UI para sair dos detalhes
-        if (newFrameId !== rootFrameId) {
-            rootFrameId = newFrameId;
-            initialSelectionIds = validNodes.map(n => n.id);
-            console.log("🔄 Novo frame selecionado:", validNodes[0].name);
-            // Sinaliza para a UI que o frame mudou (para sair dos detalhes se estiver neles)
-            figma.ui.postMessage({ type: "frame-changed" });
-        }
-    }
-
-
+    // 🔥 SEMPRE reanalisa
     if (currentTab === "colors") {
-        analyzeColors(validNodes);
+        await analyzeColors([container]);
     } else {
-        analyzeTypography(validNodes);
+        await analyzeTypography([container]);
     }
+
 });
+
 
 figma.ui.onmessage = async (msg) => {
     console.log("📩 mensagem recebida:", msg);
@@ -1190,16 +1188,26 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "select-node") {
         try {
-            ignoringSelectionChange = true;
             const node = await figma.getNodeByIdAsync(msg.nodeId);
+
             if (node && isSceneNode(node)) {
+
+                ignoringSelectionChange = true;
+
                 figma.currentPage.selection = [node];
                 figma.viewport.scrollAndZoomIntoView([node]);
+
+                // 🔥 Desliga no próximo tick
+                setTimeout(() => {
+                    ignoringSelectionChange = false;
+                }, 0);
             }
+
         } catch (err) {
             console.error("Erro ao buscar node:", err);
         }
     }
+
 
     if (msg.type === "select-multiple-nodes") {
         try {

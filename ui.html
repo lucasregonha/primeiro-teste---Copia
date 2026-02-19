@@ -1294,9 +1294,23 @@
       }
 
       if (msg.type === "empty") {
+
+        // 🔥 Força estado correto
+        viewMode = "list";
+
+        // 🔥 Limpa qualquer detalhe aberto
+        clearDetail();
+
+        // 🔥 Limpa lista antiga
+        clearList();
+
+        // 🔥 Renderiza vazio
         renderEmpty();
+
         hideLoading();
+        return;
       }
+
 
       if (msg.type === "result-colors") {
         lastColorGroups = msg.groups;
