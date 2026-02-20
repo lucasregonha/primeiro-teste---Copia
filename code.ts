@@ -964,6 +964,7 @@ figma.on("selectionchange", async () => {
     console.log("SELECTION CHANGED");
 
     if (ignoringSelectionChange) {
+        console.log("IGNORE CHANGED");
         return;
     }
 
