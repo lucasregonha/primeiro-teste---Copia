@@ -403,6 +403,7 @@
       font-size: 13px;
       color: #666;
       font-family: "Inter", sans-serif;
+      text-align: center;
     }
 
     @keyframes spin {
@@ -1602,7 +1603,7 @@
             ${isLoadingTokens
           ? `<div class="tokens-loading">
                   <div class="spinner"></div>
-                  <div class="spinner-text">Buscando tokens...</div>
+                  <div class="spinner-text">Isso pode demorar alguns segundos...</div>
                 </div>`
           : (appliedTokens.length > 0
             ? `<div class="tokens-list">
@@ -1742,7 +1743,7 @@
             ${isLoadingTokens
           ? `<div class="tokens-loading">
                   <div class="spinner"></div>
-                  <div class="spinner-text">Buscando estilos...</div>
+                  <div class="spinner-text">Isso pode demorar alguns segundos...</div>
                 </div>`
           : (appliedTokens.length > 0
             ? `<div class="tokens-list">

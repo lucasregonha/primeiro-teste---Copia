@@ -11,10 +11,10 @@ let ignoringSelectionChange = false;
 let rootFrameId: string | null = null;
 let initialSelectionIds: string[] | null = null;
 let nodesWithAppliedToken = new Set<string>();
-// 🔥 CACHE GLOBAL
+
+// 🔥 CACHE — invalida quando a página muda
 let cachedColorTokens: { name: string; hex: string; styleId?: string }[] | null = null;
 let cachedTextTokens: { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[] | null = null;
-let cachedPageId: string | null = null;
 
 // 🔥 Armazena múltiplos frames selecionados
 let rootFrameIds: string[] = [];
@@ -187,204 +187,240 @@ async function hasValidTextToken(node: TextNode): Promise<boolean> {
     return false;
 }
 
-// Coleta tokens de cor aplicados
+// 🔥 Cache global da página — invalida quando a página muda ou é forçado
+let cachedPageId: string | null = null;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FASE 1 — Coleta SÍNCRONA: percorre a árvore inteira SEM nenhum await,
+//           apenas acumulando IDs já disponíveis no objeto local do node.
+//           É extremamente rápida mesmo em páginas com milhares de elementos.
+// ─────────────────────────────────────────────────────────────────────────────
+interface RawCollected {
+    styleIds: Set<string>;                          // fillStyleId / strokeStyleId
+    varIdToSolidHex: Map<string, string>;           // variableId → cor resolvida no momento
+    textStyleIds: Set<string>;
+}
+
+function collectIdsSync(root: BaseNode): RawCollected {
+    const styleIds = new Set<string>();
+    const varIdToSolidHex = new Map<string, string>();
+    const textStyleIds = new Set<string>();
+
+    function walk(node: BaseNode): void {
+        if (!isSceneNode(node as SceneNode)) {
+            if ("children" in node) {
+                for (const child of (node as ChildrenMixin).children) walk(child);
+            }
+            return;
+        }
+
+        const n = node as SceneNode;
+
+        // fillStyleId
+        if ("fillStyleId" in n && typeof n.fillStyleId === "string" && n.fillStyleId !== "") {
+            styleIds.add(n.fillStyleId);
+        }
+
+        // strokeStyleId
+        if ("strokeStyleId" in n && typeof n.strokeStyleId === "string" && n.strokeStyleId !== "") {
+            styleIds.add(n.strokeStyleId);
+        }
+
+        // textStyleId
+        if (n.type === "TEXT" && typeof n.textStyleId === "string" && n.textStyleId !== "") {
+            textStyleIds.add(n.textStyleId);
+        }
+
+        // variáveis de cor (boundVariables em fills / strokes)
+        // O id da variável está disponível de forma síncrona no boundVariables
+        const paints: Paint[] = [];
+        if ("fills" in n && Array.isArray(n.fills)) paints.push(...(n.fills as Paint[]));
+        if ("strokes" in n && Array.isArray(n.strokes)) paints.push(...(n.strokes as Paint[]));
+
+        for (const paint of paints) {
+            if (paint.type !== "SOLID") continue;
+            const bv = (paint as any).boundVariables;
+            if (bv && bv.color?.type === "VARIABLE_ALIAS" && bv.color.id) {
+                const varId: string = bv.color.id;
+                if (!varIdToSolidHex.has(varId)) {
+                    // Guarda a cor atual como fallback para preview
+                    varIdToSolidHex.set(varId, rgbToHex((paint as SolidPaint).color));
+                }
+            }
+        }
+
+        if ("children" in n) {
+            for (const child of (n as ChildrenMixin).children) walk(child);
+        }
+    }
+
+    walk(root);
+    return { styleIds, varIdToSolidHex, textStyleIds };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FASE 2 — Resolução ASYNC em lote: executa todas as chamadas de API em
+//           paralelo com Promise.all, eliminando a serialização do loop.
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function collectAppliedColorTokens(
-    frames: (FrameNode | ComponentNode | InstanceNode)[]
+    _frames: (FrameNode | ComponentNode | InstanceNode)[]
 ): Promise<{ name: string; hex: string; styleId?: string }[]> {
 
-    if (cachedColorTokens && cachedPageId === figma.currentPage.id) {
+    const pageId = figma.currentPage.id;
+
+    if (cachedColorTokens && cachedPageId === pageId) {
         console.log("⚡ Usando cache de color tokens");
         return cachedColorTokens;
     }
 
+    console.log("🔍 Coletando tokens de cor (toda a página, síncrono + batch async)...");
+    const t0 = Date.now();
+
+    // ── Fase 1: coleta síncrona de toda a página ──────────────────────────────
+    const { styleIds, varIdToSolidHex } = collectIdsSync(figma.currentPage);
+    console.log(`   📊 Fase 1 concluída em ${Date.now() - t0}ms — styleIds: ${styleIds.size}, varIds: ${varIdToSolidHex.size}`);
+
     const tokenSet = new Map<string, { name: string; hex: string; styleId?: string }>();
 
-    console.log("🔍 Coletando estilos de cor de TODO o arquivo...");
-
-    const styleIdsInFile = new Set<string>();
-    let nodesProcessed = 0;
-
-    async function collectStyleIds(node: BaseNode) {
-        if (!isSceneNode(node)) {
-            if ("children" in node) {
-                for (const child of node.children) {
-                    await collectStyleIds(child);
-                }
-            }
-            return;
-        }
-
-        nodesProcessed++;
-
-        if ("fillStyleId" in node && typeof node.fillStyleId === "string" && node.fillStyleId !== "") {
-            styleIdsInFile.add(node.fillStyleId);
-        }
-
-        if ("strokeStyleId" in node && typeof node.strokeStyleId === "string" && node.strokeStyleId !== "") {
-            styleIdsInFile.add(node.strokeStyleId);
-        }
-
-        if ("boundVariables" in node && node.boundVariables) {
-            const bv = node.boundVariables as Record<string, any>;
-
-            const fillVars = bv["fills"];
-            if (Array.isArray(fillVars)) {
-                for (const v of fillVars) {
-                    if (v?.type === "VARIABLE_ALIAS" && v?.id) {
-                        try {
-                            const variable = await figma.variables.getVariableByIdAsync(v.id);
-                            if (variable && variable.resolvedType === "COLOR") {
-                                const varKey = `var_${variable.id}`;
-                                const cleanName = removeTokenPrefix(variable.name);
-                                if (!tokenSet.has(varKey) && isValidTokenName(cleanName)) {
-                                    const fills = "fills" in node && Array.isArray(node.fills) ? node.fills : [];
-                                    const solidFill = fills.find((f: any) => f.type === "SOLID");
-                                    const hex = solidFill ? rgbToHex(solidFill.color) : "#000000";
-                                    tokenSet.set(varKey, { name: cleanName, hex, styleId: variable.id });
-                                }
-                            }
-                        } catch (e) { }
-                    }
-                }
-            }
-
-            const strokeVars = bv["strokes"];
-            if (Array.isArray(strokeVars)) {
-                for (const v of strokeVars) {
-                    if (v?.type === "VARIABLE_ALIAS" && v?.id) {
-                        try {
-                            const variable = await figma.variables.getVariableByIdAsync(v.id);
-                            if (variable && variable.resolvedType === "COLOR") {
-                                const varKey = `var_${variable.id}`;
-                                const cleanName = removeTokenPrefix(variable.name);
-                                if (!tokenSet.has(varKey) && isValidTokenName(cleanName)) {
-                                    const strokes = "strokes" in node && Array.isArray(node.strokes) ? node.strokes : [];
-                                    const solidStroke = strokes.find((s: any) => s.type === "SOLID");
-                                    const hex = solidStroke ? rgbToHex(solidStroke.color) : "#000000";
-                                    tokenSet.set(varKey, { name: cleanName, hex, styleId: variable.id });
-                                }
-                            }
-                        } catch (e) { }
-                    }
-                }
-            }
-        }
-
-        if ("children" in node) {
-            for (const child of node.children) {
-                await collectStyleIds(child);
-            }
+    // ── Fase 2a: resolve variáveis em paralelo ─────────────────────────────────
+    const varIds = Array.from(varIdToSolidHex.keys());
+    const varResults = await Promise.all(
+        varIds.map(id => figma.variables.getVariableByIdAsync(id).catch(() => null))
+    );
+    for (let i = 0; i < varIds.length; i++) {
+        const variable = varResults[i];
+        if (!variable || variable.resolvedType !== "COLOR") continue;
+        const cleanName = removeTokenPrefix(variable.name);
+        if (!isValidTokenName(cleanName)) continue;
+        const varKey = `var_${variable.id}`;
+        if (!tokenSet.has(varKey)) {
+            tokenSet.set(varKey, {
+                name: cleanName,
+                hex: varIdToSolidHex.get(varIds[i]) ?? "#000000",
+                styleId: variable.id
+            });
         }
     }
 
-    await figma.currentPage.loadAsync();
-    await collectStyleIds(figma.currentPage);
+    // ── Fase 2b: resolve estilos de paint em paralelo ──────────────────────────
+    const styleIdArr = Array.from(styleIds);
+    const styleResults = await Promise.all(
+        styleIdArr.map(id => figma.getStyleByIdAsync(id).catch(() => null))
+    );
+    for (const style of styleResults) {
+        if (!style || style.type !== "PAINT") continue;
+        const paintStyle = style as PaintStyle;
+        if (!paintStyle.paints?.length) continue;
+        const firstPaint = paintStyle.paints[0];
+        if (firstPaint.type !== "SOLID") continue;
+        const cleanName = removeTokenPrefix(paintStyle.name);
+        if (!isValidTokenName(cleanName)) continue;
+        tokenSet.set(style.id, { name: cleanName, hex: rgbToHex(firstPaint.color), styleId: style.id });
+    }
 
-    console.log("   📊 Nodes processados:", nodesProcessed);
-    console.log("   📌 Style IDs únicos:", styleIdsInFile.size);
-
-    for (const styleId of styleIdsInFile) {
-        try {
-            const style = await figma.getStyleByIdAsync(styleId);
-            if (style && style.type === "PAINT") {
-                const paintStyle = style as PaintStyle;
-                if (paintStyle.paints && paintStyle.paints.length > 0) {
-                    const firstPaint = paintStyle.paints[0];
-                    if (firstPaint.type === "SOLID") {
-                        const hex = rgbToHex(firstPaint.color);
-                        tokenSet.set(styleId, { name: removeTokenPrefix(paintStyle.name), hex, styleId });
-                    }
-                }
+    // ── Fallback: estilos locais quando nada foi encontrado ───────────────────
+    if (tokenSet.size === 0) {
+        console.log("   ⚠️ Sem tokens na página, buscando estilos locais...");
+        const localStyles = await figma.getLocalPaintStylesAsync().catch(() => []);
+        for (const style of localStyles) {
+            if (!VALID_TOKEN_PREFIXES.some(prefix => style.name.startsWith(prefix))) continue;
+            if (!style.paints?.length) continue;
+            const fp = style.paints[0];
+            if (fp.type !== "SOLID") continue;
+            const cleanName = removeTokenPrefix(style.name);
+            if (isValidTokenName(cleanName)) {
+                tokenSet.set(style.id, { name: cleanName, hex: rgbToHex(fp.color), styleId: style.id });
             }
-        } catch (e) { }
+        }
     }
 
     const result = Array.from(tokenSet.values());
+    console.log(`   ✅ Tokens de cor resolvidos: ${result.length} em ${Date.now() - t0}ms`);
+
     cachedColorTokens = result;
-    cachedPageId = figma.currentPage.id;
+    cachedPageId = pageId;
     return result;
 }
 
-// Coleta tokens de texto aplicados
 async function collectAppliedTextTokens(
-    frames: (FrameNode | ComponentNode | InstanceNode)[],
+    _frames: (FrameNode | ComponentNode | InstanceNode)[],
     currentStyle?: { fontFamily: string; fontSize?: number; fontWeight?: any }
 ): Promise<{ name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[]> {
 
-    if (cachedTextTokens && cachedPageId === figma.currentPage.id) {
+    const pageId = figma.currentPage.id;
+
+    if (cachedTextTokens && cachedPageId === pageId) {
         console.log("⚡ Usando cache de text tokens");
+        if (currentStyle) {
+            return [...cachedTextTokens].sort((a, b) =>
+                calculateTextStyleDistance(currentStyle, a) - calculateTextStyleDistance(currentStyle, b)
+            );
+        }
         return cachedTextTokens;
     }
 
+    console.log("🔍 Coletando tokens de texto (toda a página, síncrono + batch async)...");
+    const t0 = Date.now();
+
+    // ── Fase 1: coleta síncrona ───────────────────────────────────────────────
+    const { textStyleIds } = collectIdsSync(figma.currentPage);
+    console.log(`   📊 Fase 1 concluída em ${Date.now() - t0}ms — textStyleIds: ${textStyleIds.size}`);
+
+    // Fallback para estilos locais se página não tem nenhum
+    if (textStyleIds.size === 0) {
+        const localStyles = await figma.getLocalTextStylesAsync().catch(() => []);
+        for (const s of localStyles) textStyleIds.add(s.id);
+    }
+
+    // ── Fase 2: resolve todos os estilos em paralelo ──────────────────────────
+    const styleIdArr = Array.from(textStyleIds);
+    const styleResults = await Promise.all(
+        styleIdArr.map(id => figma.getStyleByIdAsync(id).catch(() => null))
+    );
+
+    // Coleta as fontes únicas que precisam ser carregadas
+    const fontsToLoad = new Set<string>();
+    for (const style of styleResults) {
+        if (!style || style.type !== "TEXT") continue;
+        const ts = style as TextStyle;
+        if (ts.fontName && typeof ts.fontName === "object" && "family" in ts.fontName) {
+            fontsToLoad.add(JSON.stringify(ts.fontName));
+        }
+    }
+
+    // Carrega todas as fontes em paralelo
+    await Promise.all(
+        Array.from(fontsToLoad).map(f => figma.loadFontAsync(JSON.parse(f) as FontName).catch(() => {}))
+    );
+
     const tokenSet = new Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>();
-    const styleIdsInFile = new Set<string>();
-
-    async function collectStyleIds(node: BaseNode) {
-        if (!isSceneNode(node)) {
-            if ("children" in node) {
-                for (const child of node.children) {
-                    await collectStyleIds(child);
-                }
-            }
-            return;
-        }
-
-        if (node.type === "TEXT") {
-            if (node.textStyleId && typeof node.textStyleId === "string" && node.textStyleId !== "") {
-                styleIdsInFile.add(node.textStyleId);
-            }
-        }
-
-        if ("children" in node) {
-            for (const child of node.children) {
-                await collectStyleIds(child);
-            }
-        }
-    }
-
-    await collectStyleIds(figma.currentPage);
-
-    if (styleIdsInFile.size === 0) {
-        const localStyles = await figma.getLocalTextStylesAsync();
-        for (const style of localStyles) {
-            styleIdsInFile.add(style.id);
-        }
-    }
-
-    for (const styleId of styleIdsInFile) {
-        try {
-            const style = await figma.getStyleByIdAsync(styleId);
-            if (style && style.type === "TEXT") {
-                const textStyle = style as TextStyle;
-                if (textStyle.fontName && typeof textStyle.fontName === 'object' && 'family' in textStyle.fontName) {
-                    try {
-                        await figma.loadFontAsync(textStyle.fontName as FontName);
-                        const key = `${textStyle.name}_${styleId}`;
-                        tokenSet.set(key, {
-                            name: textStyle.name,
-                            styleId,
-                            fontFamily: textStyle.fontName.family,
-                            fontStyle: textStyle.fontName.style,
-                            fontSize: typeof textStyle.fontSize === 'number' ? textStyle.fontSize : undefined
-                        });
-                    } catch (fontError) { }
-                }
-            }
-        } catch (e) { }
-    }
-
-    let tokens = Array.from(tokenSet.values());
-
-    if (currentStyle) {
-        tokens = tokens.sort((a, b) => {
-            const distA = calculateTextStyleDistance(currentStyle, a);
-            const distB = calculateTextStyleDistance(currentStyle, b);
-            return distA - distB;
+    for (const style of styleResults) {
+        if (!style || style.type !== "TEXT") continue;
+        const textStyle = style as TextStyle;
+        if (!textStyle.fontName || typeof textStyle.fontName !== "object" || !("family" in textStyle.fontName)) continue;
+        const key = `${textStyle.name}_${style.id}`;
+        tokenSet.set(key, {
+            name: textStyle.name,
+            styleId: style.id,
+            fontFamily: textStyle.fontName.family,
+            fontStyle: textStyle.fontName.style,
+            fontSize: typeof textStyle.fontSize === "number" ? textStyle.fontSize : undefined
         });
     }
 
+    let tokens = Array.from(tokenSet.values());
+    console.log(`   ✅ Tokens de texto resolvidos: ${tokens.length} em ${Date.now() - t0}ms`);
+
     cachedTextTokens = tokens;
-    cachedPageId = figma.currentPage.id;
+    cachedPageId = pageId;
+
+    if (currentStyle) {
+        tokens = [...tokens].sort((a, b) =>
+            calculateTextStyleDistance(currentStyle, a) - calculateTextStyleDistance(currentStyle, b)
+        );
+    }
+
     return tokens;
 }
 
@@ -461,7 +497,6 @@ async function analyzeColors(
         }
     }
 
-    // 🔥 CORRIGIDO: Percorre TODOS os frames passados
     for (const node of nodes) {
         await walk(node);
     }
@@ -521,7 +556,6 @@ async function analyzeTypography(
         }
     }
 
-    // 🔥 CORRIGIDO: Percorre TODOS os frames passados
     for (const node of nodes) {
         await walk(node);
     }
@@ -552,7 +586,7 @@ interface CustomTextStyle {
 
 /* ---------- HELPERS ---------- */
 
-// 🔥 NOVO: Coleta todos os frames válidos da seleção atual
+// 🔥 Coleta todos os frames válidos da seleção atual
 function getValidFramesFromSelection(): (FrameNode | ComponentNode | InstanceNode | SectionNode)[] {
     const selection = figma.currentPage.selection;
     const frames: (FrameNode | ComponentNode | InstanceNode | SectionNode)[] = [];
@@ -560,7 +594,6 @@ function getValidFramesFromSelection(): (FrameNode | ComponentNode | InstanceNod
     for (const node of selection) {
         let current: SceneNode | null = node;
 
-        // Sobe até encontrar um container válido
         while (
             current &&
             current.type !== "FRAME" &&
@@ -579,6 +612,8 @@ function getValidFramesFromSelection(): (FrameNode | ComponentNode | InstanceNod
     return frames;
 }
 
+
+
 /* ---------- EVENTS ---------- */
 
 figma.on("selectionchange", async () => {
@@ -592,24 +627,21 @@ figma.on("selectionchange", async () => {
     const selection = figma.currentPage.selection;
 
     if (selection.length === 0) {
-        // 🔥 Limpa os IDs salvos para que switch-tab não use frames antigos
         rootFrameIds = [];
         rootFrameId = null;
         figma.ui.postMessage({ type: "empty", clearAll: true });
         return;
     }
 
-    // 🔥 CORRIGIDO: Coleta TODOS os frames únicos da seleção
     const containers = getValidFramesFromSelection();
 
     if (containers.length === 0) return;
 
-    // 🔥 Atualiza lista de IDs raiz
     const newFrameIds = containers.map(c => c.id);
     const frameChanged = JSON.stringify(newFrameIds) !== JSON.stringify(rootFrameIds);
 
     rootFrameIds = newFrameIds;
-    rootFrameId = newFrameIds[0]; // mantém compatibilidade
+    rootFrameId = newFrameIds[0];
 
     figma.ui.postMessage({ type: "selection-changed" });
 
@@ -644,7 +676,6 @@ figma.ui.onmessage = async (msg) => {
             }
 
             if (nodes.length > 0) {
-                // 🔥 CORRIGIDO: Seta o flag ANTES de mudar a seleção
                 ignoringSelectionChange = true;
 
                 figma.currentPage.selection = nodes;
@@ -652,17 +683,14 @@ figma.ui.onmessage = async (msg) => {
 
                 console.log("✅ Seleção restaurada:", nodes.map(n => n.name));
 
-                // 🔥 CORRIGIDO: Desativa o flag com delay suficiente
                 await new Promise(resolve => setTimeout(resolve, 100));
                 ignoringSelectionChange = false;
 
-                // Re-analisa com todos os frames
                 const validNodes = nodes.filter(
                     (n): n is FrameNode | ComponentNode | InstanceNode =>
                         n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
                 );
 
-                // 🔥 CORRIGIDO: Se seleção original não tem frames diretos, usa rootFrameIds
                 if (validNodes.length > 0) {
                     console.log("🔄 Re-analisando frames...");
                     if (currentTab === "colors") {
@@ -751,7 +779,6 @@ figma.ui.onmessage = async (msg) => {
         initialSelectionIds = figma.currentPage.selection.map(n => n.id);
         console.log("📌 seleção inicial atualizada:", initialSelectionIds);
 
-        // 🔥 CORRIGIDO: Salva TODOS os frames válidos
         const containers = getValidFramesFromSelection();
         if (containers.length > 0) {
             rootFrameIds = containers.map(c => c.id);
@@ -764,7 +791,6 @@ figma.ui.onmessage = async (msg) => {
         try {
             const node = await figma.getNodeByIdAsync(msg.nodeId);
             if (node && isSceneNode(node)) {
-                // 🔥 CORRIGIDO: Seta flag ANTES, desativa com promise
                 ignoringSelectionChange = true;
                 figma.currentPage.selection = [node];
                 figma.viewport.scrollAndZoomIntoView([node]);
@@ -779,7 +805,6 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "select-multiple-nodes") {
         try {
-            // 🔥 CORRIGIDO: Seta flag ANTES, desativa com promise
             ignoringSelectionChange = true;
 
             const nodes = await Promise.all(
@@ -808,7 +833,6 @@ figma.ui.onmessage = async (msg) => {
 
     if (msg.type === "get-suggested-tokens") {
         try {
-            // 🔥 CORRIGIDO: Usa rootFrameIds para buscar todos os frames
             let validNodes: (FrameNode | ComponentNode | InstanceNode)[] = figma.currentPage.selection.filter(
                 (n): n is FrameNode | ComponentNode | InstanceNode =>
                     n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
@@ -999,7 +1023,6 @@ figma.ui.onmessage = async (msg) => {
     if (msg.type === "toggle-hidden") {
         showHiddenElements = msg.value;
 
-        // 🔥 CORRIGIDO: Usa rootFrameIds
         let validNodes: (FrameNode | ComponentNode | InstanceNode)[] = figma.currentPage.selection.filter(
             (n): n is FrameNode | ComponentNode | InstanceNode =>
                 n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
@@ -1026,19 +1049,16 @@ figma.ui.onmessage = async (msg) => {
     if (msg.type === "switch-tab") {
         currentTab = msg.tab;
 
-        // 🔥 CORRIGIDO: Só usa rootFrameIds se ainda há seleção ativa no canvas
         const hasActiveSelection = figma.currentPage.selection.length > 0;
 
         let validNodes: (FrameNode | ComponentNode | InstanceNode)[] = [];
 
         if (hasActiveSelection) {
-            // Tem seleção: coleta os frames dela
             validNodes = figma.currentPage.selection.filter(
                 (n): n is FrameNode | ComponentNode | InstanceNode =>
                     n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
             );
 
-            // Se selecionou filhos (não frames diretos), sobe para os containers
             if (validNodes.length === 0) {
                 const containers = getValidFramesFromSelection();
                 validNodes = containers.filter(
@@ -1047,7 +1067,6 @@ figma.ui.onmessage = async (msg) => {
                 );
             }
 
-            // Fallback: usa rootFrameIds mas só porque ainda há seleção
             if (validNodes.length === 0 && rootFrameIds.length > 0) {
                 for (const id of rootFrameIds) {
                     const rootNode = await figma.getNodeByIdAsync(id);
@@ -1195,7 +1214,6 @@ figma.ui.onmessage = async (msg) => {
     }
 
     if (msg.type === "reanalyze") {
-        // 🔥 CORRIGIDO: Usa rootFrameIds
         let validNodes: (FrameNode | ComponentNode | InstanceNode)[] = figma.currentPage.selection.filter(
             (n): n is FrameNode | ComponentNode | InstanceNode =>
                 n.type === "FRAME" || n.type === "COMPONENT" || n.type === "INSTANCE"
@@ -1224,7 +1242,6 @@ figma.ui.onmessage = async (msg) => {
 figma.ui.postMessage({ type: "init-tab", tab: currentTab });
 
 (async () => {
-    // 🔥 CORRIGIDO: Coleta todos os frames válidos da seleção inicial
     const containers = getValidFramesFromSelection();
 
     if (containers.length > 0) {
