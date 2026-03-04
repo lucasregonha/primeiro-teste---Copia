@@ -752,6 +752,7 @@
   <div class="tabs">
     <div class="tab active" onclick="switchTab('colors')">Colors</div>
     <div class="tab" onclick="switchTab('typography')">Font styles</div>
+    <div class="tab" onclick="switchTab('spacing')">Spacing</div>
   </div>
 
   <div id="app"></div>
@@ -869,6 +870,7 @@
     let currentTab = "colors";
     let lastColorGroups = [];
     let lastTypographyGroups = [];
+    let lastSpacingGroups = [];
     let appliedTokens = [];
     let isSelectAllMode = false;
     let isLoadingTokens = false;
@@ -881,6 +883,31 @@
 
     // 🔥 Rastreia o último token aplicado (para mostrar o check)
     let lastAppliedStyleId = null;
+
+    const SPACING_ICONS = {
+      "Gap": `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M20.4135 18.372C22.0254 18.3727 23.3333 19.6797 23.3333 21.2918V22.1654C23.3326 22.8093 22.8093 23.3325 22.1654 23.3333C21.5209 23.3333 20.9983 22.8098 20.9975 22.1654V21.2918C20.9975 20.9697 20.7354 20.7086 20.4135 20.7078H2.9198C2.59729 20.7078 2.33584 20.9692 2.33584 21.2918V22.1654C2.33508 22.8095 1.8121 23.3329 1.16792 23.3333C0.523369 23.3333 0.00076674 22.8098 0 22.1654V21.2918C0 19.6792 1.30724 18.372 2.9198 18.372H20.4135Z" fill="#18181B"/>
+<path d="M16.9143 10.4976C17.559 10.4979 18.0821 11.0208 18.0823 11.6655C18.0823 12.3104 17.5591 12.8332 16.9143 12.8334H6.41672C5.7717 12.8334 5.2488 12.3106 5.2488 11.6655C5.24896 11.0206 5.77179 10.4976 6.41672 10.4976H16.9143Z" fill="#18181B"/>
+<path d="M22.1654 0C22.8096 0.000970806 23.3333 0.523496 23.3333 1.16792V2.04158C23.3326 3.6529 22.0248 4.96041 20.4135 4.96138H2.9198C1.30771 4.96138 0.000761902 3.6535 0 2.04158V1.16792C0 0.522896 0.522896 0 1.16792 0C1.81257 0.000442964 2.33584 0.52317 2.33584 1.16792V2.04158C2.3366 2.36344 2.59776 2.62554 2.9198 2.62554H20.4135C20.7348 2.62457 20.9967 2.36285 20.9975 2.04158V1.16792C20.9975 0.522896 21.5204 0 22.1654 0Z" fill="#18181B"/>
+</svg>
+`,
+      "Padding Top": `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M4 9H20" stroke="currentColor" stroke-width="2"/></svg>`,
+      "Padding Bottom": `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M4 15H20" stroke="currentColor" stroke-width="2"/></svg>`,
+      "Padding Left": `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M9 4V20" stroke="currentColor" stroke-width="2"/></svg>`,
+      "Padding Right": `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path d="M15 4V20" stroke="currentColor" stroke-width="2"/></svg>`,
+      "Border Radius": `<svg width="20" height="20" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M1.25 19.9992C1.93986 19.9992 2.4992 20.5594 2.5 21.249V22.7502C2.5 23.8205 2.50045 24.5506 2.54639 25.1131C2.59116 25.6601 2.67395 25.9406 2.77344 26.1359C3.01301 26.6057 3.39488 26.9874 3.86475 27.227C4.06012 27.3265 4.34039 27.4092 4.8877 27.454C5.45031 27.5 6.18025 27.5004 7.25098 27.5004H8.75C9.44024 27.5004 9.99981 28.0601 10 28.7502C10 29.4404 9.44036 30 8.75 30H7.25098C6.2215 30 5.37309 30.0001 4.68506 29.9439C3.98254 29.8865 3.33609 29.7647 2.72949 29.4557C1.78892 28.9764 1.02375 28.2114 0.544434 27.271C0.235457 26.6645 0.113558 26.018 0.0561523 25.3157C-3.37651e-05 24.6278 2.95088e-10 23.7793 2.95088e-10 22.7502V21.249C0.000795301 20.5594 0.560135 19.9992 1.25 19.9992Z" fill="#18181B"/>
+<path d="M28.75 19.9992C29.4399 19.9992 29.9992 20.5594 30 21.249V22.7502C30 23.7793 30 24.6278 29.9438 25.3157C29.8864 26.018 29.7645 26.6645 29.4556 27.271C28.9763 28.2114 28.2111 28.9764 27.2705 29.4557C26.6639 29.7647 26.0175 29.8865 25.3149 29.9439C24.6269 30.0001 23.7785 30 22.749 30H21.25C20.5596 30 20 29.4404 20 28.7502C20.0002 28.0601 20.5598 27.5004 21.25 27.5004H22.749C23.8197 27.5004 24.5497 27.5 25.1123 27.454C25.6596 27.4092 25.9399 27.3265 26.1353 27.227C26.6051 26.9874 26.987 26.6057 27.2266 26.1359C27.326 25.9406 27.4088 25.6601 27.4536 25.1131C27.4996 24.5506 27.5 23.8205 27.5 22.7502V21.249C27.5008 20.5594 28.0601 19.9992 28.75 19.9992Z" fill="#18181B"/>
+<path d="M8.75 2.96213e-10C9.44022 2.96213e-10 9.99978 0.559738 10 1.2498C10 1.94004 9.44036 2.49959 8.75 2.49959H7.25098C6.18042 2.49959 5.45025 2.50002 4.8877 2.54597C4.34055 2.59076 4.06009 2.67347 3.86475 2.77299C3.39492 3.01252 3.01303 3.39438 2.77344 3.86412C2.67391 4.05942 2.59119 4.33991 2.54639 4.8869C2.50043 5.44935 2.5 6.17947 2.5 7.2498V8.75102C2.49939 9.44074 1.93998 10.0008 1.25 10.0008C0.56016 10.0006 0.000608657 9.44064 2.95088e-10 8.75102V7.2498C-1.48433e-08 6.22067 -5.45243e-05 5.37212 0.0561523 4.6843C0.11358 3.98202 0.235409 3.33544 0.544434 2.72905C1.02376 1.78868 1.78896 1.02357 2.72949 0.544345C3.33602 0.235355 3.98263 0.113558 4.68506 0.0561432C5.37302 -5.62753e-05 6.22164 -1.1372e-08 7.25098 2.96213e-10H8.75Z" fill="#18181B"/>
+<path d="M22.749 2.96213e-10C23.7785 2.96213e-10 24.6269 -5.9162e-05 25.3149 0.0561432C26.0174 0.113543 26.664 0.235377 27.2705 0.544345C28.211 1.02355 28.9762 1.78871 29.4556 2.72905C29.7646 3.33544 29.8864 3.98203 29.9438 4.6843C30.0001 5.37212 30 6.22067 30 7.2498V8.75102C29.9994 9.44074 29.44 10.0008 28.75 10.0008C28.06 10.0008 27.5006 9.44074 27.5 8.75102V7.2498C27.5 6.17947 27.4996 5.44935 27.4536 4.8869C27.4088 4.33992 27.3261 4.05941 27.2266 3.86412C26.987 3.39441 26.6051 3.01249 26.1353 2.77299C25.9399 2.67349 25.6595 2.59075 25.1123 2.54597C24.5497 2.50002 23.8197 2.49959 22.749 2.49959H21.25C20.5596 2.49959 20 1.94004 20 1.2498C20.0002 0.559738 20.5598 2.96213e-10 21.25 2.96213e-10H22.749Z" fill="#18181B"/>
+</svg>
+`
+    };
+
+    function getSpacingIcon(type) {
+      if (type.startsWith("Border Radius")) return SPACING_ICONS["Border Radius"];
+      return SPACING_ICONS[type] || SPACING_ICONS["Gap"];
+    }
 
     function applyTypographyToken(tokenId, nodeIds) {
       parent.postMessage(
@@ -979,13 +1006,14 @@
       currentTab = tab;
 
       // Atualiza visual das tabs
-      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      const tabs = document.querySelectorAll(".tab");
-      if (tab === "colors") {
-        tabs[0].classList.add("active");
-      } else {
-        tabs[1].classList.add("active");
-      }
+      document.querySelectorAll(".tab").forEach((t, i) => {
+        const tabNames = ["colors", "typography", "spacing"];
+        if (tabNames[i] === tab) {
+          t.classList.add("active");
+        } else {
+          t.classList.remove("active");
+        }
+      });
 
       // Mostra loading
       showLoading();
@@ -1124,7 +1152,6 @@
         currentView = "list";
       }
 
-      // Token aplicado com sucesso
       if (msg.type === "token-applied-success") {
         console.log("Token aplicado com sucesso!", msg);
 
@@ -1151,12 +1178,17 @@
               if (token && token.hex) {
                 tokenData.hex = token.hex;
               }
-            } else {
+            } else if (currentTab === "typography") {
               // 🔥 Para tipografia, salva também fontStyle e fontSize
               const token = appliedTokens.find(t => t.styleId === msg.styleId);
               if (token) {
                 tokenData.fontStyle = token.fontStyle;
                 tokenData.fontSize = token.fontSize;
+              }
+            } else if (currentTab === "spacing") {
+              const token = appliedTokens.find(t => t.styleId === msg.styleId);
+              if (token) {
+                tokenData.value = token.value;
               }
             }
 
@@ -1175,22 +1207,27 @@
             if (token && token.hex) {
               tokenData.hex = token.hex;
             }
-          } else {
+          } else if (currentTab === "typography") {
             // 🔥 Para tipografia, salva também fontStyle e fontSize
             const token = appliedTokens.find(t => t.styleId === msg.styleId);
             if (token) {
               tokenData.fontStyle = token.fontStyle;
               tokenData.fontSize = token.fontSize;
             }
+          } else if (currentTab === "spacing") {
+            const token = appliedTokens.find(t => t.styleId === msg.styleId);
+            if (token) {
+              tokenData.value = token.value;
+            }
           }
 
           appliedTokensByNode.set(currentItem.nodeId, tokenData);
         }
 
-        // 🔥 Atualiza os detalhes na tela (hex ou nome da fonte)
+        // 🔥 Atualiza os detalhes na tela
         if (viewMode === "detail") {
           const hexCodeEl = document.getElementById('hex-code');
-          if (hexCodeEl && msg.styleName) {
+          if (hexCodeEl && msg.styleName && currentTab !== "spacing") {
             hexCodeEl.textContent = msg.styleName;
           }
 
@@ -1198,7 +1235,6 @@
           if (currentTab === "colors" && msg.styleId) {
             const detailSwatch = document.querySelector('.detail-swatch-large');
             if (detailSwatch) {
-              // Busca a cor do token aplicado
               const appliedToken = appliedTokens.find(t => t.styleId === msg.styleId);
               if (appliedToken && appliedToken.hex) {
                 detailSwatch.style.backgroundColor = appliedToken.hex;
@@ -1209,8 +1245,10 @@
           // 🔥 Re-renderiza para mostrar o check e atualizar descrição
           if (currentTab === "colors") {
             renderColorDetail();
-          } else {
+          } else if (currentTab === "typography") {
             renderTypographyDetail();
+          } else {
+            renderSpacingDetail();
           }
         }
       }
@@ -1252,7 +1290,7 @@
             }
 
             renderColorDetail();
-          } else {
+          } else if (currentTab === "typography") {
             const entry = currentGroup.nodeStyles[currentIndex];
             const style = entry.style;
 
@@ -1261,6 +1299,8 @@
             }
 
             renderTypographyDetail();
+          } else {
+            renderSpacingDetail();
           }
         }
       }
@@ -1319,6 +1359,31 @@
         // Garante que o loading seja escondido após a renderização
         setTimeout(() => hideLoading(), 0);
       }
+
+      if (msg.type === "result-spacing") {
+        lastSpacingGroups = msg.groups;
+        renderSpacingList(msg.groups);
+        setTimeout(() => hideLoading(), 0);
+      }
+
+      if (msg.type === "empty-initial") {
+        viewMode = "list";
+        renderTopBar(false);
+        app.innerHTML = `
+          <div class="empty">
+            <div style="font-size: 14px; color: #71717A;">Selecione um ou mais frames</div>
+          </div>
+        `;
+        hideLoading();
+      }
+
+      if (msg.type === "result-suggested-spacing-tokens") {
+        appliedTokens = msg.tokens || [];
+        isLoadingTokens = false;
+        renderSpacingDetail();
+      }
+
+
 
       if (msg.type === "result-suggested-tokens") {
         appliedTokens = msg.tokens || [];
@@ -1477,6 +1542,173 @@
 
     }
 
+    function renderSpacingList(groups) {
+      viewMode = "list";
+      renderTopBar(true);
+
+      if (!groups.length) {
+        app.innerHTML = `
+    <div class="app-wrapper">
+      <h4>Espaços sem padrão aplicados:</h4>
+      <div class="empty-2">
+        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAARtSURBVHgBzVlNbBtFFP5mvIbiKMHQH3GoXa9aIyKQ6oIEF1BdDnDpJVyoxIUiIU4QlxM5VElUCTiBI04IIcIBiV7IIb20l7iCS5FARoqUSiSyGyMh2kBNGrutvbvT98ZZN3Fde9Z1fj7J2p+Z2fnyvTfvzbwI9Ig/S/W0BXnUhUhDICWUiiogym0CKHsQRbrST+U9eJeTsXAOPUAE6VwoqKhjeRkJjPpkjCdSKNIlJ93apG0/UTQeZ9KJibmWN0G3o+gDiOy0KdGuBJf+cjNQGA+qWNeJSVEp1YR90Pq+Y79OjYslN4s+qfZQAgrZw/HQmYe2t3vZMKmaAVQa2wAFkV9zxIljtii3tsl2A4jc3HaRY9BKTw1qQR7EAwQbZlUpbDtUemnZ/bL17SYTLy4770KI77CDUB7OJA+Fsv5zk2Dhb5XwXDWnlEpgZ1G+5Ujb98emiT3XG98F5BjRoZA37j9oBVk91/EK6AOu33Bw9rN/9f177zyJV17ag15AKj7FKmoFWT30CfNXa6hUFU68GsHnU//p+14wZHk6/q6bmBJ+n1CpejiwL4RTbw3q65XfbqMX0J+V4avkXUm/fI/Ne+FiBS8MP94kOxCR6BFRvWOSkMd7M8JmzF5cw/mZW6SahbdHBjG/cFeb1z4URq8gbkctMm9KC/oI+PGnVVy4VMGpkSGcfHMAhWs1TZhNzEQZrKQdt3Bgv2X8XUqBaYuoJRAAbMZZIlNcriMRC+vPzP1yG+fG9jXVmr1UpXYXHCTOz6zpd5Vq4/nc2F5zVZVKiaWSezPIVuqDj//RKuzfKzWxgYjAJ6NPN/2uE3hVR0jJj943nq4sg5Bjc11fcfHh+gRM6usvnjEix0jEw7ix4iIAooGW2JXf72gy7Fu/0v3JNwa0glsJyQcc087sfzapwIuAV6ipcj54HI8PADKxEMYEmVSEFPOzQ1D1issOmTnIKqZjAW2586YDmFCVyPnEgqQx33+DqC7o6ColVM50AK9ensSPZZzG5q/e1RmjG7794X+8/lpE+685QZW3HHh/CJitFfafuZ9XUal4eP65x/DVN/e94+UX9+idC/9a0xsHcl69Y5lBBAFlkpy2lWksZKXOfrqCAvkSg83FMbBwrU4xsdo0YztwaGIFjUHH0iPxkO0T5HPvhOnY+YWavnJGaF0ofttGtOtnQHCaCJ5ubFgblYOb2EWoOzV7mCoP2lls2rnyARq7BaTe8HpZpOnN0pWTQYL2loF8r051G/+xSZBV9AQmsdOges3whqLSpniQPBjK7qSpFc19pKWY1HZpLZa8bS19MLg+k4zJY63v20bokCNGiLtxCnx0qBwXj9q1dAxOXCtRonG62iqwWZMdym8dcxzX7TylTlO9poj+o0zqZDqRY3RNws/Grel6iOQXmEafwKpx/eVwLDTVrW+g/LNAJZKwrkLQQT/4WZoVy646cqpdoRL9ILgRhZI6Tv9eSPOxVUGT5Z+/4SjTlyk78UJTOdqV5O2YuIwecA/A0uHIhF2qXAAAAABJRU5ErkJggg==" alt="Ilustração"/>
+        <div style="font-weight: 500; color: #18181B; margin-top: 8px;">Tudo certo por aqui!</div>
+      </div>
+    </div>
+    `;
+        return;
+      }
+
+      app.innerHTML = `
+  <h4>Espaços sem padrão aplicados:</h4>
+  <div class="app-wrapper-2">
+    ${groups.map((g, index) => `
+        <div class="group" onclick='openSpacingDetail(lastSpacingGroups[${index}])'>
+          <div class="swatch-large" style="display: flex; justify-content: center; align-items: center; background: #FFF; border: 1px solid #E4E4E7; color: #18181B; width: 40px; height: 40px; border-radius: 8px;">
+            ${getSpacingIcon(g.type)}
+          </div>
+
+          <div class="group-info">
+            <div class="group-info-top">
+              <strong class="hex">
+  ${g.type} ${parseFloat(g.value.toFixed(2))}px
+</strong>
+            </div>
+
+            <div class="group-info-bottom">
+              ${g.nodeStyles.length} ${g.nodeStyles.length === 1 ? "elemento" : "elementos"}
+            </div>
+          </div>
+        </div>
+      `).join("")}
+  </div>
+`;
+    }
+
+    function openSpacingDetail(group) {
+      parent.postMessage({ pluginMessage: { type: "save-initial-selection" } }, "*");
+      parent.postMessage({ pluginMessage: { type: "save-original-state", nodeIds: group.nodeStyles.map(ns => ns.nodeId) } }, "*");
+      currentGroup = group;
+      currentIndex = 0;
+      currentTab = "spacing";
+      isSelectAllMode = false;
+      isLoadingTokens = true;
+      viewMode = "detail";
+      topBarContainer.innerHTML = "";
+      appliedTokens = [];
+
+      // Verifica se o primeiro elemento tem um token aplicado
+      const firstItem = group.nodeStyles[0];
+      const appliedToken = appliedTokensByNode.get(firstItem.nodeId);
+      lastAppliedStyleId = appliedToken ? appliedToken.styleId : null;
+
+      renderSpacingDetail();
+      parent.postMessage({ pluginMessage: { type: "get-suggested-tokens", value: group.value } }, "*");
+
+      // Seleciona o primeiro elemento do grupo no Figma
+      selectCurrentNode();
+    }
+
+    function renderSpacingDetail() {
+      const entry = currentGroup.nodeStyles[currentIndex];
+
+      // 🔥 Verifica se este node já tem um token aplicado
+      const appliedTokenData = appliedTokensByNode.get(entry.nodeId);
+      const displayValue = appliedTokenData && appliedTokenData.value !== undefined
+        ? `${appliedTokenData.value}px/${appliedTokenData.styleName}`
+        : `${parseFloat(currentGroup.value.toFixed(2))}px`;
+
+      // Se tiver token, o styleId aplicado para o check é o salvo pro node
+      const currentAppliedStyleId = appliedTokenData ? appliedTokenData.styleId : null;
+
+      app.innerHTML = `
+    <div class="detail-color-wrapper">
+      <div class="detail-color-container">
+        <div class="detail-left">
+          <h4>Espaçamento:</h4>
+          <div class="container">
+            <div class="detail-swatch-large" style="display: flex; justify-content: center; align-items: center; background: #FFF; border: 1px solid #E4E4E7; color: #18181B;">
+              ${getSpacingIcon(currentGroup.type)}
+            </div>
+          
+            <div class="detail-info">
+              <div id="hex-code">${currentGroup.type}</div>
+              <div class="type-label">
+                ${displayValue}
+              </div>
+            </div>
+            
+            <div class="detail-nav">
+              <button onclick="prev()" ${currentGroup.nodeStyles.length <= 1 || isSelectAllMode ? "disabled" : ""}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+              <span class="nav-counter">
+                ${isSelectAllMode ? `${currentGroup.nodeStyles.length} de ${currentGroup.nodeStyles.length}` : `${currentIndex + 1} de ${currentGroup.nodeStyles.length}`}
+              </span>
+              <button onclick="next()" ${currentGroup.nodeStyles.length <= 1 || isSelectAllMode ? "disabled" : ""}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="nav-icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            </div>
+              
+            ${currentGroup.nodeStyles.length > 1 ? `
+              <label class="select-all-checkbox">
+                <input type="checkbox" ${isSelectAllMode ? "checked" : ""} onchange="toggleSelectAll(this.checked)">
+                <span>Selec. todos</span>
+              </label>
+            ` : ""}
+          </div>
+        </div>
+
+        <div class="detail-right">
+          <h4>Tokens sugeridos:</h4>
+          <div class="tokens-container">
+            ${isLoadingTokens
+          ? `<div class="tokens-loading">
+                  <div class="spinner"></div>
+                  <div class="spinner-text">Isso pode demorar alguns segundos...</div>
+                </div>`
+          : (appliedTokens.length > 0
+            ? `<div class="tokens-list">
+                    ${appliedTokens.map(token => {
+              const safeName = (token.name || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+              const isApplied = currentAppliedStyleId === token.styleId;
+              return `
+                      <div class="token-item" onclick="applySpacingToken('${token.styleId || ''}')" title="${safeName}">
+                        <div style="flex: 1; min-width: 0;">
+                          <div class="token-name">${token.value}px/${token.name}</div>
+                        </div>
+                        ${isApplied ? `
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="token-check-icon">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                          </svg>
+                        ` : ''}
+                      </div>
+                    `}).join("")}
+                  </div>`
+            : `<div class="empty-state-tokens">
+                    Sem tokens de espaço para sugerir.
+                  </div>`
+          )
+        }
+          </div>
+        </div>
+      </div>
+      <div class="detail-footer">
+        <button class="back-button" onclick="back()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+          Voltar para a lista
+        </button>
+      </div>
+    </div>
+  `;
+    }
+
     function openDetail(group) {
       // 🔥 Salva a seleção inicial quando abre os detalhes
       parent.postMessage({ pluginMessage: { type: "save-initial-selection" } }, "*");
@@ -1486,6 +1718,7 @@
 
       currentGroup = group;
       currentIndex = 0;
+      currentTab = "colors";
       isSelectAllMode = false;
       isLoadingTokens = true;
       viewMode = "detail";
@@ -1513,6 +1746,7 @@
 
       currentGroup = group;
       currentIndex = 0;
+      currentTab = "typography";
       isSelectAllMode = false;
       isLoadingTokens = true;
       viewMode = "detail";
@@ -1545,7 +1779,6 @@
       const displayBg = appliedTokenData && appliedTokenData.hex ? appliedTokenData.hex : bg;
 
       app.innerHTML = `
-    <div class="detail-color-wrapper">
       <div class="detail-color-container">
         <div class="detail-left">
           <h4>Cor:</h4>
@@ -1630,7 +1863,7 @@
         }
           </div>
         </div>
-      </div>
+    </div>
 
       <div class="detail-footer">
         <button class="back-button" onclick="back()">
@@ -1641,7 +1874,7 @@
         </button>
       </div>
     </div>
-  `;
+      `;
     }
 
     function renderTypographyDetail() {
@@ -1655,14 +1888,13 @@
       const displayLabel = appliedTokenData ? appliedTokenData.styleName : style.fontFamily;
       const displayFontStyle = appliedTokenData && appliedTokenData.fontStyle ? appliedTokenData.fontStyle : style.fontStyle;
       const displayFontSize = appliedTokenData && appliedTokenData.fontSize
-        ? `${appliedTokenData.fontSize}px`
-        : (typeof style.fontSize === "number" ? `${style.fontSize}px` : style.fontSize);
+        ? `${appliedTokenData.fontSize} px`
+        : (typeof style.fontSize === "number" ? `${style.fontSize} px` : style.fontSize);
 
       const fontWeight = typeof style.fontWeight === "number" ? style.fontWeight : 400;
       const cssFont = parseFigmaFontStyle(style.fontStyle, fontWeight);
 
       app.innerHTML = `
-    <div class="detail-color-wrapper">
       <div class="detail-color-container">
 
         <!-- ESQUERDA (igual cor) -->
@@ -1788,7 +2020,7 @@
           Voltar para a lista
         </button>
       </div>
-    </div>
+    </div >
   `;
     }
 
@@ -1812,8 +2044,10 @@
 
       if (currentTab === "colors") {
         renderColorDetail();
-      } else {
+      } else if (currentTab === "typography") {
         renderTypographyDetail();
+      } else {
+        renderSpacingDetail();
       }
 
       selectCurrentNode();
@@ -1839,8 +2073,10 @@
 
       if (currentTab === "colors") {
         renderColorDetail();
-      } else {
+      } else if (currentTab === "typography") {
         renderTypographyDetail();
+      } else {
+        renderSpacingDetail();
       }
 
       selectCurrentNode();
@@ -1874,7 +2110,7 @@
         // Remove o token aplicado
         if (currentTab === "colors") {
           removeColorToken(nodeIds, isStroke);
-        } else {
+        } else if (currentTab === "typography") {
           removeTextToken(nodeIds);
         }
         return;
@@ -1884,7 +2120,7 @@
         // Para cores, usa apply-token-multiple com isStroke
         console.log("🔵 Aplicando cor...");
         applyTokenToNodes(styleId, nodeIds, isStroke);
-      } else {
+      } else if (currentTab === "typography") {
         // Para tipografia, usa apply-typography-token-multiple
         console.log("🔵 Aplicando tipografia...", { type: "apply-typography-token-multiple", styleId, nodeIds });
         parent.postMessage({
@@ -1933,9 +2169,54 @@
 
       if (currentTab === "colors") {
         renderColorList(lastColorGroups);
-      } else {
+      } else if (currentTab === "typography") {
         renderTypographyList(lastTypographyGroups);
+      } else {
+        renderSpacingList(lastSpacingGroups);
       }
+    }
+
+    function applySpacingToken(styleId) {
+      const items = currentGroup.nodeStyles;
+      let nodeIds;
+
+      if (isSelectAllMode) {
+        nodeIds = items.map(n => n.nodeId);
+      } else {
+        nodeIds = [items[currentIndex].nodeId];
+      }
+
+      // Toggle: clicou no token já aplicado → remove
+      const currentItem = items[currentIndex];
+      const currentApplied = appliedTokensByNode.get(currentItem.nodeId);
+
+      if (currentApplied && currentApplied.styleId === styleId) {
+        // Remove as bound variables das propriedades de espaçamento
+        parent.postMessage({
+          pluginMessage: {
+            type: "remove-spacing-token",
+            nodeIds,
+            spacingType: currentGroup.type
+          }
+        }, "*");
+        lastAppliedStyleId = null;
+        // Limpa do mapa de tokens aplicados
+        for (const nId of nodeIds) {
+          appliedTokensByNode.delete(nId);
+        }
+        renderSpacingDetail();
+        return;
+      }
+
+      // Aplica o token via backend
+      parent.postMessage({
+        pluginMessage: {
+          type: "apply-spacing-token",
+          styleId,
+          nodeIds,
+          spacingType: currentGroup.type
+        }
+      }, "*");
     }
   </script>
 </body>

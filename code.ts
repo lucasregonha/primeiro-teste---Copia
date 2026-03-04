@@ -6,7 +6,7 @@ figma.showUI(__html__, { width: 360, height: 422 });
 
 // Variáveis de estado
 let showHiddenElements = false;
-let currentTab: "colors" | "typography" = "colors";
+let currentTab: "colors" | "typography" | "spacing" = "colors";
 let ignoringSelectionChange = false;
 let rootFrameId: string | null = null;
 let initialSelectionIds: string[] | null = null;
@@ -15,6 +15,7 @@ let nodesWithAppliedToken = new Set<string>();
 // 🔥 CACHE — invalida quando a página muda
 let cachedColorTokens: { name: string; hex: string; styleId?: string }[] | null = null;
 let cachedTextTokens: { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }[] | null = null;
+let cachedSpacingTokens: { styleId: string; name: string; value: number; type: string }[] | null = null;
 
 // 🔥 Armazena múltiplos frames selecionados
 let rootFrameIds: string[] = [];
@@ -36,6 +37,17 @@ interface OriginalNodeState {
     textDecoration?: TextDecoration | symbol;
     paragraphSpacing?: number | symbol;
     paragraphIndent?: number | symbol;
+    // 🔥 Propriedades de espaçamento
+    itemSpacing?: number;
+    paddingTop?: number;
+    paddingBottom?: number;
+    paddingLeft?: number;
+    paddingRight?: number;
+    cornerRadius?: number | symbol;
+    topLeftRadius?: number;
+    topRightRadius?: number;
+    bottomLeftRadius?: number;
+    bottomRightRadius?: number;
 }
 let originalNodeStates = new Map<string, OriginalNodeState>();
 
@@ -64,15 +76,19 @@ function isGradientPaint(p: Paint): p is GradientPaint {
     );
 }
 
-// Prefixos válidos de tokens de cor
+// Prefixos válidos de tokens de cor e espaçamento
 const VALID_TOKEN_PREFIXES = [
     "Base Color/",
     "Contextual Color/",
     "Base/",
     "Surface Colors/",
     "Content Colors/",
-    "Brand Colors/"
+    "Brand Colors/",
+    "Spacing/"
 ];
+
+// Escala de espaçamento padrão
+const spacingScale = [4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64, 80, 120, 160, 200];
 
 // Remove o prefixo do nome do token para exibição
 function removeTokenPrefix(tokenName: string): string {
@@ -135,6 +151,98 @@ function calculateTextStyleDistance(
     distance += Math.abs(sourceWeight - targetWeight) / 100;
 
     return distance;
+}
+
+// Coleta síncrona de IDs de variáveis FLOAT usadas em propriedades de espaçamento/raio
+function collectSpacingVarIdsSync(root: BaseNode): Set<string> {
+    const varIds = new Set<string>();
+    const SPACING_PROPS = [
+        "itemSpacing", "paddingTop", "paddingBottom", "paddingLeft", "paddingRight",
+        "cornerRadius", "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"
+    ];
+
+    function walk(node: BaseNode): void {
+        if ("boundVariables" in node) {
+            const bv = (node as any).boundVariables;
+            if (bv) {
+                for (const prop of SPACING_PROPS) {
+                    if (bv[prop]?.type === "VARIABLE_ALIAS" && bv[prop].id) {
+                        varIds.add(bv[prop].id);
+                    }
+                }
+            }
+        }
+        if ("children" in node) {
+            for (const child of (node as ChildrenMixin).children) walk(child);
+        }
+    }
+    walk(root);
+    return varIds;
+}
+
+async function collectAppliedSpacingTokens(targetValue: number): Promise<any[]> {
+    const pageId = figma.currentPage.id;
+
+    // ⚡ Cache — retorna o cache e re-ordena pelo valor mais próximo
+    if (cachedSpacingTokens && cachedSpacingTokens.length > 0 && cachedPageId === pageId) {
+        console.log("⚡ Usando cache de spacing tokens");
+        return [...cachedSpacingTokens].sort((a, b) =>
+            Math.abs(a.value - targetValue) - Math.abs(b.value - targetValue)
+        );
+    }
+
+    console.log("🔍 Coletando tokens de espaçamento para valor:", targetValue);
+    const t0 = Date.now();
+
+    // ── Fase 1: scan síncrono de toda a página por boundVariables FLOAT já aplicados ──
+    const varIds = collectSpacingVarIdsSync(figma.currentPage);
+    console.log(`   📊 varIds aplicados na página: ${varIds.size}`);
+
+    // ── Fase 2: Sempre usa variáveis FLOAT locais como base ──────────────────
+    const localVars = await figma.variables.getLocalVariablesAsync();
+    const floatLocalIds = localVars.filter(v => v.resolvedType === "FLOAT").map(v => v.id);
+
+    // Merge: prioriza os já aplicados na página + todos os locais
+    const allIds = Array.from(new Set([...Array.from(varIds), ...floatLocalIds]));
+    console.log(`   📊 total de variáveis para resolver: ${allIds.length}`);
+
+    // ── Fase 3: resolve em paralelo ───────────────────────────────────────────
+    const resolved = await Promise.all(
+        allIds.map(id => figma.variables.getVariableByIdAsync(id).catch(() => null))
+    );
+
+    const tokenSet = new Map<string, any>();
+    for (const variable of resolved) {
+        if (!variable || variable.resolvedType !== "FLOAT") continue;
+        const modes = Object.keys(variable.valuesByMode);
+        if (modes.length === 0) continue;
+        const val = variable.valuesByMode[modes[0]];
+        if (typeof val !== "number") continue;
+
+        const cleanName = removeTokenPrefix(variable.name);
+        if (!isValidTokenName(cleanName)) continue;
+
+        if (!tokenSet.has(variable.id)) {
+            tokenSet.set(variable.id, {
+                styleId: variable.id,
+                name: cleanName,
+                value: val,
+                type: "VARIABLE"
+            });
+        }
+    }
+
+    const allTokens = Array.from(tokenSet.values());
+    console.log(`   ✅ Tokens de espaçamento resolvidos: ${allTokens.length} em ${Date.now() - t0}ms`);
+
+    // Salva no cache
+    cachedSpacingTokens = allTokens;
+    cachedPageId = pageId;
+
+    // Retorna ordenado pelo mais próximo ao valor
+    return [...allTokens].sort((a, b) =>
+        Math.abs(a.value - targetValue) - Math.abs(b.value - targetValue)
+    ).slice(0, 10);
 }
 
 // 🔥 CORRIGIDO: Verifica se um paint tem token válido
@@ -269,7 +377,7 @@ async function collectAppliedColorTokens(
 
     const pageId = figma.currentPage.id;
 
-    if (cachedColorTokens && cachedPageId === pageId) {
+    if (cachedColorTokens && cachedColorTokens.length > 0 && cachedPageId === pageId) {
         console.log("⚡ Usando cache de color tokens");
         return cachedColorTokens;
     }
@@ -350,7 +458,7 @@ async function collectAppliedTextTokens(
 
     const pageId = figma.currentPage.id;
 
-    if (cachedTextTokens && cachedPageId === pageId) {
+    if (cachedTextTokens && cachedTextTokens.length > 0 && cachedPageId === pageId) {
         console.log("⚡ Usando cache de text tokens");
         if (currentStyle) {
             return [...cachedTextTokens].sort((a, b) =>
@@ -391,7 +499,7 @@ async function collectAppliedTextTokens(
 
     // Carrega todas as fontes em paralelo
     await Promise.all(
-        Array.from(fontsToLoad).map(f => figma.loadFontAsync(JSON.parse(f) as FontName).catch(() => {}))
+        Array.from(fontsToLoad).map(f => figma.loadFontAsync(JSON.parse(f) as FontName).catch(() => { }))
     );
 
     const tokenSet = new Map<string, { name: string; styleId: string; fontFamily?: string; fontStyle?: string; fontSize?: number }>();
@@ -572,6 +680,89 @@ async function analyzeTypography(
     figma.ui.postMessage({ type: "result-typography", groups });
 }
 
+async function analyzeSpacing(
+    nodes: (FrameNode | ComponentNode | InstanceNode | SectionNode)[]
+) {
+    const issues: { nodeId: string, nodeName: string, type: string, value: number, expected: string }[] = [];
+
+    function checkValue(value: number, node: SceneNode, type: string) {
+        if (value > 0 && !spacingScale.includes(value)) {
+            issues.push({
+                nodeId: node.id,
+                nodeName: node.name,
+                type: type,
+                value: value,
+                expected: spacingScale.join(", ")
+            });
+        }
+    }
+
+    async function walk(node: SceneNode): Promise<void> {
+        if (!showHiddenElements && !node.visible) return;
+
+        // 1. Analisar Auto Layout
+        if ("layoutMode" in node && node.layoutMode !== "NONE") {
+            const n = node as FrameNode | ComponentNode | InstanceNode;
+            checkValue(n.itemSpacing, n, "Gap");
+            checkValue(n.paddingTop, n, "Padding Top");
+            checkValue(n.paddingBottom, n, "Padding Bottom");
+            checkValue(n.paddingLeft, n, "Padding Left");
+            checkValue(n.paddingRight, n, "Padding Right");
+        }
+
+        // 2. Analisar Border Radius
+        if ("cornerRadius" in node) {
+            const n = node as any;
+            if (n.cornerRadius !== figma.mixed) {
+                checkValue(n.cornerRadius, n, "Border Radius");
+            } else {
+                checkValue(n.topLeftRadius, n, "Border Radius Top Left");
+                checkValue(n.topRightRadius, n, "Border Radius Top Right");
+                checkValue(n.bottomLeftRadius, n, "Border Radius Bottom Left");
+                checkValue(n.bottomRightRadius, n, "Border Radius Bottom Right");
+            }
+        }
+
+        if ("children" in node) {
+            for (const c of node.children) {
+                if (isSceneNode(c)) await walk(c);
+            }
+        }
+    }
+
+    for (const node of nodes) {
+        await walk(node);
+    }
+
+    // Agrupar problemas por tipo e valor
+    const groupedIssues: Map<string, any> = new Map();
+
+    issues.forEach(issue => {
+        const key = `${issue.type}_${issue.value}`;
+        if (!groupedIssues.has(key)) {
+            groupedIssues.set(key, {
+                type: issue.type,
+                value: issue.value,
+                expected: issue.expected,
+                nodes: []
+            });
+        }
+        groupedIssues.get(key).nodes.push({
+            nodeId: issue.nodeId,
+            nodeName: issue.nodeName
+        });
+    });
+
+    const groups = Array.from(groupedIssues.values()).map(g => ({
+        type: g.type,
+        value: g.value,
+        expected: g.expected,
+        nodeStyles: g.nodes // Reusando nome nodeStyles para compatibilidade com o layout da UI
+    }));
+
+    figma.ui.postMessage({ type: "result-spacing", groups });
+}
+
 /* ---------- TYPES ---------- */
 
 interface CustomTextStyle {
@@ -651,8 +842,10 @@ figma.on("selectionchange", async () => {
 
     if (currentTab === "colors") {
         await analyzeColors(containers);
-    } else {
+    } else if (currentTab === "typography") {
         await analyzeTypography(containers);
+    } else {
+        await analyzeSpacing(containers);
     }
 });
 
@@ -695,8 +888,10 @@ figma.ui.onmessage = async (msg) => {
                     console.log("🔄 Re-analisando frames...");
                     if (currentTab === "colors") {
                         await analyzeColors(validNodes);
-                    } else {
+                    } else if (currentTab === "typography") {
                         await analyzeTypography(validNodes);
+                    } else {
+                        await analyzeSpacing(validNodes);
                     }
                 } else if (rootFrameIds.length > 0) {
                     const rootNodes: (FrameNode | ComponentNode | InstanceNode)[] = [];
@@ -709,8 +904,10 @@ figma.ui.onmessage = async (msg) => {
                     if (rootNodes.length > 0) {
                         if (currentTab === "colors") {
                             await analyzeColors(rootNodes);
-                        } else {
+                        } else if (currentTab === "typography") {
                             await analyzeTypography(rootNodes);
+                        } else {
+                            await analyzeSpacing(rootNodes);
                         }
                     }
                 }
@@ -749,6 +946,16 @@ figma.ui.onmessage = async (msg) => {
                 if ("strokeStyleId" in node) state.strokeStyleId = node.strokeStyleId;
                 if ("fills" in node) state.fills = JSON.parse(JSON.stringify(node.fills));
                 if ("strokes" in node) state.strokes = JSON.parse(JSON.stringify(node.strokes));
+                if ("itemSpacing" in node) state.itemSpacing = node.itemSpacing;
+                if ("paddingTop" in node) state.paddingTop = node.paddingTop;
+                if ("paddingBottom" in node) state.paddingBottom = node.paddingBottom;
+                if ("paddingLeft" in node) state.paddingLeft = node.paddingLeft;
+                if ("paddingRight" in node) state.paddingRight = node.paddingRight;
+                if ("cornerRadius" in node) state.cornerRadius = node.cornerRadius;
+                if ("topLeftRadius" in node) state.topLeftRadius = node.topLeftRadius;
+                if ("topRightRadius" in node) state.topRightRadius = node.topRightRadius;
+                if ("bottomLeftRadius" in node) state.bottomLeftRadius = node.bottomLeftRadius;
+                if ("bottomRightRadius" in node) state.bottomRightRadius = node.bottomRightRadius;
             }
 
             if (node.type === "TEXT") {
@@ -851,7 +1058,7 @@ figma.ui.onmessage = async (msg) => {
                 if (currentTab === "colors") {
                     const appliedTokens = await collectAppliedColorTokens(validNodes);
                     figma.ui.postMessage({ type: "result-suggested-tokens", tokens: appliedTokens });
-                } else {
+                } else if (currentTab === "typography") {
                     let currentStyle = undefined;
                     if (msg.nodeId) {
                         const node = await figma.getNodeByIdAsync(msg.nodeId);
@@ -864,6 +1071,9 @@ figma.ui.onmessage = async (msg) => {
                     }
                     const appliedTokens = await collectAppliedTextTokens(validNodes, currentStyle);
                     figma.ui.postMessage({ type: "result-suggested-text-tokens", tokens: appliedTokens });
+                } else if (currentTab === "spacing") {
+                    const appliedTokens = await collectAppliedSpacingTokens(msg.value || 0);
+                    figma.ui.postMessage({ type: "result-suggested-spacing-tokens", tokens: appliedTokens });
                 }
             } else {
                 figma.ui.postMessage({ type: "result-suggested-tokens", tokens: [] });
@@ -1040,8 +1250,10 @@ figma.ui.onmessage = async (msg) => {
         if (validNodes.length > 0) {
             if (currentTab === "colors") {
                 await analyzeColors(validNodes);
-            } else {
+            } else if (currentTab === "typography") {
                 await analyzeTypography(validNodes);
+            } else {
+                await analyzeSpacing(validNodes);
             }
         }
     }
@@ -1078,12 +1290,14 @@ figma.ui.onmessage = async (msg) => {
         }
 
         if (validNodes.length === 0) {
-            figma.ui.postMessage({ type: "empty", clearAll: true });
+            figma.ui.postMessage({ type: "empty-initial", tab: currentTab });
         } else {
             if (currentTab === "colors") {
                 analyzeColors(validNodes);
-            } else {
+            } else if (currentTab === "typography") {
                 analyzeTypography(validNodes);
+            } else {
+                analyzeSpacing(validNodes);
             }
         }
     }
@@ -1231,10 +1445,114 @@ figma.ui.onmessage = async (msg) => {
         if (validNodes.length > 0) {
             if (currentTab === "colors") {
                 await analyzeColors(validNodes);
-            } else {
+            } else if (currentTab === "typography") {
                 await analyzeTypography(validNodes);
+            } else {
+                await analyzeSpacing(validNodes);
             }
         }
+    }
+
+    if (msg.type === "apply-spacing-token") {
+        const styleId = msg.styleId;
+        const nodeIds: string[] = msg.nodeIds || [];
+        const type = msg.spacingType;
+        let lastDisplayName = styleId;
+
+        const propertyMap: { [key: string]: string } = {
+            "Gap": "itemSpacing",
+            "Padding Top": "paddingTop",
+            "Padding Bottom": "paddingBottom",
+            "Padding Left": "paddingLeft",
+            "Padding Right": "paddingRight",
+            "Border Radius Top Left": "topLeftRadius",
+            "Border Radius Top Right": "topRightRadius",
+            "Border Radius Bottom Left": "bottomLeftRadius",
+            "Border Radius Bottom Right": "bottomRightRadius"
+        };
+
+        const prop = propertyMap[type];
+
+        for (const nodeId of nodeIds) {
+            const node = await figma.getNodeByIdAsync(nodeId);
+            if (!node || !("setBoundVariable" in node)) continue;
+
+            try {
+                const variable = await figma.variables.getVariableByIdAsync(styleId).catch(() => null);
+                if (variable) {
+                    if (type === "Border Radius") {
+                        // Aplica raio uniforme vinculando os 4 cantos
+                        const cornerProps: VariableBindableNodeField[] = [
+                            "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"
+                        ];
+                        for (const p of cornerProps) {
+                            (node as any).setBoundVariable(p, variable);
+                        }
+                    } else if (prop) {
+                        (node as any).setBoundVariable(prop as VariableBindableNodeField, variable);
+                    }
+                    lastDisplayName = removeTokenPrefix(variable.name);
+                    figma.ui.postMessage({ type: "token-applied-success", styleName: lastDisplayName, styleId: variable.id });
+                }
+            } catch (err) {
+                console.error("Erro ao aplicar token de espaçamento:", err);
+            }
+        }
+    }
+    if (msg.type === "remove-spacing-token") {
+        const nodeIds: string[] = msg.nodeIds || [];
+        const type = msg.spacingType;
+
+        const propertyMap: { [key: string]: string } = {
+            "Gap": "itemSpacing",
+            "Padding Top": "paddingTop",
+            "Padding Bottom": "paddingBottom",
+            "Padding Left": "paddingLeft",
+            "Padding Right": "paddingRight",
+            "Border Radius Top Left": "topLeftRadius",
+            "Border Radius Top Right": "topRightRadius",
+            "Border Radius Bottom Left": "bottomLeftRadius",
+            "Border Radius Bottom Right": "bottomRightRadius"
+        };
+
+        const prop = propertyMap[type];
+
+        for (const nodeId of nodeIds) {
+            const node = await figma.getNodeByIdAsync(nodeId);
+            if (!node || !("setBoundVariable" in node)) continue;
+
+            try {
+                const originalState = originalNodeStates.get(nodeId);
+
+                if (type === "Border Radius") {
+                    const cornerProps = [
+                        "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"
+                    ] as const;
+                    for (const p of cornerProps) {
+                        (node as any).setBoundVariable(p, null);
+                        if (originalState) {
+                            if (p === "topLeftRadius" && originalState.topLeftRadius !== undefined) (node as any).topLeftRadius = originalState.topLeftRadius;
+                            if (p === "topRightRadius" && originalState.topRightRadius !== undefined) (node as any).topRightRadius = originalState.topRightRadius;
+                            if (p === "bottomLeftRadius" && originalState.bottomLeftRadius !== undefined) (node as any).bottomLeftRadius = originalState.bottomLeftRadius;
+                            if (p === "bottomRightRadius" && originalState.bottomRightRadius !== undefined) (node as any).bottomRightRadius = originalState.bottomRightRadius;
+                            if (originalState.cornerRadius !== undefined && originalState.cornerRadius !== figma.mixed) (node as any).cornerRadius = originalState.cornerRadius;
+                        }
+                    }
+                } else if (prop) {
+                    (node as any).setBoundVariable(prop as VariableBindableNodeField, null);
+                    if (originalState) {
+                        if (prop === "itemSpacing" && originalState.itemSpacing !== undefined) (node as any).itemSpacing = originalState.itemSpacing;
+                        if (prop === "paddingTop" && originalState.paddingTop !== undefined) (node as any).paddingTop = originalState.paddingTop;
+                        if (prop === "paddingBottom" && originalState.paddingBottom !== undefined) (node as any).paddingBottom = originalState.paddingBottom;
+                        if (prop === "paddingLeft" && originalState.paddingLeft !== undefined) (node as any).paddingLeft = originalState.paddingLeft;
+                        if (prop === "paddingRight" && originalState.paddingRight !== undefined) (node as any).paddingRight = originalState.paddingRight;
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao remover token de espaçamento:", err);
+            }
+        }
+        figma.ui.postMessage({ type: "token-removed-success" });
     }
 };
 
@@ -1252,8 +1570,10 @@ figma.ui.postMessage({ type: "init-tab", tab: currentTab });
 
         if (currentTab === "colors") {
             analyzeColors(containers);
-        } else {
+        } else if (currentTab === "typography") {
             analyzeTypography(containers);
+        } else {
+            analyzeSpacing(containers);
         }
     } else {
         figma.ui.postMessage({ type: "empty", clearAll: true });
